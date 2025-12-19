@@ -1,0 +1,20 @@
+services:
+  bestholiday-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bestholiday-finans
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - N8N_TRANSACTION_WEBHOOK=${N8N_TRANSACTION_WEBHOOK:-https://n8n.globaltripmarket.com/webhook/transaction}
+      - N8N_QUERY_WEBHOOK=${N8N_QUERY_WEBHOOK:-https://n8n.globaltripmarket.com/webhook/query}
+      - N8N_REPORT_WEBHOOK=${N8N_REPORT_WEBHOOK:-https://n8n.globaltripmarket.com/webhook/report}
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
