@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { queryData } from "@/lib/actions/n8n"
+import { aiQuery } from "@/lib/actions/n8n"
 
 interface Message {
     id: string
@@ -51,14 +51,34 @@ export default function QueryPage() {
         setIsLoading(true)
 
         try {
-            const response = await queryData(prompt)
+            const response = await aiQuery(prompt)
+
+            let answerContent = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
+
+            if (response.success && response.data) {
+                // Handle different response formats from n8n
+                const data = response.data as Record<string, unknown>
+                if (typeof data === 'string') {
+                    answerContent = data
+                } else if (data.output) {
+                    answerContent = String(data.output)
+                } else if (data.answer) {
+                    answerContent = String(data.answer)
+                } else if (data.response) {
+                    answerContent = String(data.response)
+                } else if (data.text) {
+                    answerContent = String(data.text)
+                } else {
+                    answerContent = JSON.stringify(data, null, 2)
+                }
+            } else if (response.error) {
+                answerContent = response.error
+            }
 
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: response.success
-                    ? (response.data as { answer: string })?.answer || "Veriler işleniyor..."
-                    : "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.",
+                content: answerContent,
                 timestamp: new Date(),
             }
 
@@ -135,7 +155,7 @@ export default function QueryPage() {
                                     <div className="rounded-lg px-4 py-2 bg-muted">
                                         <div className="flex items-center gap-2">
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            <span className="text-sm">Analiz ediliyor...</span>
+                                            <span className="text-sm">n8n AI analiz ediyor...</span>
                                         </div>
                                     </div>
                                 </div>

@@ -1,5 +1,3 @@
-"use client"
-
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Receipt } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,52 +9,20 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { useTransactionStore } from "@/lib/store/transaction-store"
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell,
-    Legend,
-} from "recharts"
+import { getDashboardStats, getRecentTransactions, getWeeklyStats, getExpenseDistribution } from "@/lib/actions/db"
+import { WeeklyChart } from "@/components/charts/weekly-chart"
+import { ExpensePieChart } from "@/components/charts/expense-pie-chart"
 
-const weeklyData = [
-    { name: "Pzt", gelir: 4000, gider: 2400 },
-    { name: "Sal", gelir: 3000, gider: 1398 },
-    { name: "Çar", gelir: 2000, gider: 800 },
-    { name: "Per", gelir: 2780, gider: 1908 },
-    { name: "Cum", gelir: 5890, gider: 2800 },
-    { name: "Cmt", gelir: 8390, gider: 3800 },
-    { name: "Paz", gelir: 6490, gider: 1300 },
-]
+export const dynamic = 'force-dynamic'
 
-const expenseData = [
-    { name: "Yakıt", value: 7300, color: "#f97316" },
-    { name: "Personel", value: 3500, color: "#3b82f6" },
-    { name: "Ofis", value: 1200, color: "#10b981" },
-]
-
-export default function AdminDashboard() {
-    const transactions = useTransactionStore((state) => state.transactions)
-
-    const totalIncome = transactions
-        .filter((t) => t.type === "gelir")
-        .reduce((acc, t) => acc + t.amount, 0)
-
-    const totalExpense = transactions
-        .filter((t) => t.type === "gider")
-        .reduce((acc, t) => acc + t.amount, 0)
-
-    const netBalance = totalIncome - totalExpense
-
-    const recentTransactions = transactions.slice(0, 5)
+export default async function AdminDashboard() {
+    // Fetch data directly from PostgreSQL
+    const [stats, transactions, weeklyData, expenseData] = await Promise.all([
+        getDashboardStats(),
+        getRecentTransactions(5),
+        getWeeklyStats(),
+        getExpenseDistribution(),
+    ])
 
     return (
         <div className="space-y-6">
@@ -74,12 +40,12 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-500">
-                            ₺{totalIncome.toLocaleString("tr-TR")}
+                            ₺{stats.income.toLocaleString("tr-TR")}
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                             <ArrowUpRight className="h-3 w-3 text-green-500" />
-                            <span className="text-green-500">+12.5%</span>
-                            <span>geçen aya göre</span>
+                            <span className="text-green-500">Canlı Veri</span>
+                            <span>PostgreSQL</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -96,12 +62,12 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-red-500">
-                            ₺{totalExpense.toLocaleString("tr-TR")}
+                            ₺{stats.expense.toLocaleString("tr-TR")}
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                             <ArrowDownRight className="h-3 w-3 text-red-500" />
-                            <span className="text-red-500">-8.2%</span>
-                            <span>geçen aya göre</span>
+                            <span className="text-red-500">Canlı Veri</span>
+                            <span>PostgreSQL</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -118,12 +84,12 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-primary">
-                            ₺{netBalance.toLocaleString("tr-TR")}
+                            ₺{stats.balance.toLocaleString("tr-TR")}
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                             <ArrowUpRight className="h-3 w-3 text-primary" />
-                            <span className="text-primary">+18.3%</span>
-                            <span>geçen aya göre</span>
+                            <span className="text-primary">Canlı Veri</span>
+                            <span>PostgreSQL</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -142,25 +108,7 @@ export default function AdminDashboard() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={weeklyData}>
-                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                    <XAxis dataKey="name" className="text-xs" />
-                                    <YAxis className="text-xs" />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "hsl(var(--card))",
-                                            border: "1px solid hsl(var(--border))",
-                                            borderRadius: "8px",
-                                        }}
-                                        formatter={(value) => [`₺${Number(value).toLocaleString("tr-TR")}`, ""]}
-                                    />
-                                    <Bar dataKey="gelir" name="Gelir" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="gider" name="Gider" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <WeeklyChart data={weeklyData} />
                     </CardContent>
                 </Card>
 
@@ -175,34 +123,7 @@ export default function AdminDashboard() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={expenseData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={100}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {expenseData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "hsl(var(--card))",
-                                            border: "1px solid hsl(var(--border))",
-                                            borderRadius: "8px",
-                                        }}
-                                        formatter={(value) => [`₺${Number(value).toLocaleString("tr-TR")}`, ""]}
-                                    />
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <ExpensePieChart data={expenseData} />
                     </CardContent>
                 </Card>
             </div>
@@ -212,43 +133,49 @@ export default function AdminDashboard() {
                 <CardHeader>
                     <CardTitle>Son İşlemler</CardTitle>
                     <CardDescription>
-                        En son yapılan finansal hareketler
+                        Veritabanından alınan son finansal hareketler
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Tarih</TableHead>
-                                <TableHead>Açıklama</TableHead>
-                                <TableHead>Kategori</TableHead>
-                                <TableHead>Tür</TableHead>
-                                <TableHead className="text-right">Tutar</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {recentTransactions.map((transaction) => (
-                                <TableRow key={transaction.id}>
-                                    <TableCell className="font-medium">
-                                        {new Date(transaction.date).toLocaleDateString("tr-TR")}
-                                    </TableCell>
-                                    <TableCell>{transaction.description}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{transaction.category}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={transaction.type === "gelir" ? "success" : "destructive"}>
-                                            {transaction.type === "gelir" ? "Gelir" : "Gider"}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className={`text-right font-medium ${transaction.type === "gelir" ? "text-green-500" : "text-red-500"
-                                        }`}>
-                                        {transaction.type === "gelir" ? "+" : "-"}₺{transaction.amount.toLocaleString("tr-TR")}
-                                    </TableCell>
+                    {transactions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            Henüz işlem bulunmuyor. Veritabanı bağlantısını kontrol edin.
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Tarih</TableHead>
+                                    <TableHead>Açıklama</TableHead>
+                                    <TableHead>Kategori</TableHead>
+                                    <TableHead>Tür</TableHead>
+                                    <TableHead className="text-right">Tutar</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {transactions.map((transaction) => (
+                                    <TableRow key={transaction.id}>
+                                        <TableCell className="font-medium">
+                                            {transaction.date ? new Date(transaction.date).toLocaleDateString("tr-TR") : '-'}
+                                        </TableCell>
+                                        <TableCell>{transaction.description}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{transaction.category}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={transaction.type === "INCOME" ? "success" : "destructive"}>
+                                                {transaction.type === "INCOME" ? "Gelir" : "Gider"}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className={`text-right font-medium ${transaction.type === "INCOME" ? "text-green-500" : "text-red-500"
+                                            }`}>
+                                            {transaction.type === "INCOME" ? "+" : "-"}₺{transaction.amount.toLocaleString("tr-TR")}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
                 </CardContent>
             </Card>
         </div>
