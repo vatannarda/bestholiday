@@ -40,11 +40,13 @@ export interface DashboardData {
  */
 export async function fetchDashboardData(): Promise<DashboardData> {
     try {
+        // Use POST method as n8n webhooks typically require POST
         const response = await fetch(N8N_DASHBOARD_DATA_WEBHOOK, {
-            method: 'GET',
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
+            body: JSON.stringify({ action: 'fetch' }),
             cache: 'no-store', // Always fetch fresh data
         })
 
@@ -54,27 +56,56 @@ export async function fetchDashboardData(): Promise<DashboardData> {
         }
 
         const rawData = await response.json()
+        console.log('Webhook raw response:', JSON.stringify(rawData).slice(0, 500))
 
-        // Parse the n8n response format: [{ data: [{ transactions: [...] }] }]
-        let transactions: Transaction[] = []
+        // Parse the n8n response format - handle multiple possible structures
+        let rawTransactions: Array<{
+            id: number
+            amount: string
+            type: string
+            category: string
+            description: string
+            created_at: string
+        }> = []
 
+        // Format 1: [{ data: [{ transactions: [...] }] }]
         if (Array.isArray(rawData) && rawData[0]?.data?.[0]?.transactions) {
-            const rawTransactions = rawData[0].data[0].transactions
-            transactions = rawTransactions
-                .filter((t: { description?: string; amount?: string }) =>
-                    t.description && !t.description.includes('[object Object]') && parseFloat(t.amount || '0') > 0
-                )
-                .map((t: { id: number; amount: string; type: string; category: string; description: string; created_at: string }) => ({
-                    id: String(t.id),
-                    amount: parseFloat(t.amount) || 0,
-                    type: t.type as 'INCOME' | 'EXPENSE',
-                    category: t.category || 'Diğer',
-                    description: t.description || '',
-                    date: t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '',
-                    created_at: t.created_at || '',
-                }))
-                .sort((a: Transaction, b: Transaction) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            rawTransactions = rawData[0].data[0].transactions
         }
+        // Format 2: { data: [{ transactions: [...] }] }
+        else if (rawData?.data?.[0]?.transactions) {
+            rawTransactions = rawData.data[0].transactions
+        }
+        // Format 3: { transactions: [...] }
+        else if (rawData?.transactions) {
+            rawTransactions = rawData.transactions
+        }
+        // Format 4: Direct array of transactions
+        else if (Array.isArray(rawData) && rawData[0]?.id !== undefined) {
+            rawTransactions = rawData
+        }
+        // Format 5: [{ transactions: [...] }]
+        else if (Array.isArray(rawData) && rawData[0]?.transactions) {
+            rawTransactions = rawData[0].transactions
+        }
+
+        // Transform and filter transactions
+        const transactions: Transaction[] = rawTransactions
+            .filter((t) =>
+                t.description &&
+                !t.description.includes('[object Object]') &&
+                parseFloat(t.amount || '0') > 0
+            )
+            .map((t) => ({
+                id: String(t.id),
+                amount: parseFloat(t.amount) || 0,
+                type: t.type as 'INCOME' | 'EXPENSE',
+                category: t.category || 'Diğer',
+                description: t.description || '',
+                date: t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '',
+                created_at: t.created_at || '',
+            }))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
         // Calculate stats from transactions
         let income = 0
@@ -87,6 +118,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
                 expense += t.amount
             }
         }
+
+        console.log(`Processed ${transactions.length} transactions, income: ${income}, expense: ${expense}`)
 
         return {
             transactions,
