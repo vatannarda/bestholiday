@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Pencil, Trash2, PlusCircle, Search, Filter, Download, RefreshCw, Loader2 } from "lucide-react"
+import { Search, Filter, Download, RefreshCw, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
     Table,
@@ -16,15 +15,6 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import {
     Select,
     SelectContent,
     SelectItem,
@@ -33,17 +23,6 @@ import {
 } from "@/components/ui/select"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { fetchDashboardData, type Transaction } from "@/lib/actions/n8n"
-
-const categories = [
-    "Tur Satışı",
-    "Otel Komisyonu",
-    "Transfer",
-    "Yakıt",
-    "Personel",
-    "Ofis Gideri",
-    "Reklam",
-    "Diğer",
-]
 
 // Refresh interval: 5 minutes
 const REFRESH_INTERVAL = 5 * 60 * 1000
@@ -89,96 +68,6 @@ function exportToCSV(transactions: Transaction[]) {
     URL.revokeObjectURL(url)
 }
 
-// Transaction Form Component - Defined OUTSIDE main component to prevent re-renders
-function TransactionFormFields({
-    formData,
-    setFormData,
-    onClose,
-}: {
-    formData: {
-        date: string
-        amount: string
-        type: "INCOME" | "EXPENSE"
-        category: string
-        description: string
-    }
-    setFormData: React.Dispatch<React.SetStateAction<typeof formData>>
-    onClose: () => void
-}) {
-    return (
-        <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="form-date">Tarih</Label>
-                    <Input
-                        id="form-date"
-                        type="date"
-                        value={formData.date}
-                        onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="form-amount">Tutar (₺)</Label>
-                    <Input
-                        id="form-amount"
-                        type="number"
-                        placeholder="0.00"
-                        value={formData.amount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                    />
-                </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Tür</Label>
-                    <Select
-                        value={formData.type}
-                        onValueChange={(value: "INCOME" | "EXPENSE") => setFormData(prev => ({ ...prev, type: value }))}
-                    >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="INCOME">Gelir</SelectItem>
-                            <SelectItem value="EXPENSE">Gider</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label>Kategori</Label>
-                    <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Seçin..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {categories.map((cat) => (
-                                <SelectItem key={cat} value={cat}>
-                                    {cat}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="form-description">Açıklama</Label>
-                <Input
-                    id="form-description"
-                    placeholder="İşlem açıklaması..."
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                />
-            </div>
-            <DialogFooter>
-                <Button onClick={onClose}>Kapat</Button>
-            </DialogFooter>
-        </div>
-    )
-}
-
 export default function TransactionsPage() {
     const user = useAuthStore((state) => state.user)
     const isAdmin = user?.role === "admin"
@@ -188,14 +77,6 @@ export default function TransactionsPage() {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
     const [filterType, setFilterType] = useState<"all" | "INCOME" | "EXPENSE">("all")
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-    const [formData, setFormData] = useState({
-        date: new Date().toISOString().split("T")[0],
-        amount: "",
-        type: "EXPENSE" as "INCOME" | "EXPENSE",
-        category: "",
-        description: "",
-    })
 
     // Load data from webhook
     const loadData = useCallback(async (showIndicator = false) => {
@@ -280,27 +161,6 @@ export default function TransactionsPage() {
                                 <Download className="mr-2 h-4 w-4" />
                                 Excel&apos;e Aktar
                             </Button>
-                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button>
-                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                        Yeni İşlem
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Yeni İşlem Ekle</DialogTitle>
-                                        <DialogDescription>
-                                            AI ile işlem eklemek için Dashboard&apos;a gidin.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <TransactionFormFields
-                                        formData={formData}
-                                        setFormData={setFormData}
-                                        onClose={() => setIsAddDialogOpen(false)}
-                                    />
-                                </DialogContent>
-                            </Dialog>
                         </div>
                     </div>
                 </CardHeader>
@@ -339,13 +199,12 @@ export default function TransactionsPage() {
                                     <TableHead>Kategori</TableHead>
                                     <TableHead>Tür</TableHead>
                                     <TableHead className="text-right">Tutar</TableHead>
-                                    {isAdmin && <TableHead className="text-right">İşlemler</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredTransactions.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                             İşlem bulunamadı.
                                         </TableCell>
                                     </TableRow>
@@ -368,18 +227,6 @@ export default function TransactionsPage() {
                                                 }`}>
                                                 {transaction.type === "INCOME" ? "+" : "-"}₺{transaction.amount.toLocaleString("tr-TR")}
                                             </TableCell>
-                                            {isAdmin && (
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button variant="ghost" size="icon" disabled>
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" disabled>
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            )}
                                         </TableRow>
                                     ))
                                 )}
