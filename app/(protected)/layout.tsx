@@ -51,6 +51,8 @@ export default function ProtectedLayout({
     })
     const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [isLoadingData, setIsLoadingData] = useState(true)
+    const [dataError, setDataError] = useState(false)
 
     // Dynamic nav items based on language
     const adminNavItems = [
@@ -67,11 +69,15 @@ export default function ProtectedLayout({
     // Load sidebar data from webhook
     const loadSidebarData = useCallback(async () => {
         try {
+            setDataError(false)
             const data = await fetchDashboardData()
             setDashboardStats(data.stats)
             setRecentTransactions(data.transactions.slice(0, 5))
         } catch (error) {
             console.error('Sidebar data load error:', error)
+            setDataError(true)
+        } finally {
+            setIsLoadingData(false)
         }
     }, [])
 

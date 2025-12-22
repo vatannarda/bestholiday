@@ -33,6 +33,21 @@ export const translations = {
             logout: "Çıkış Yap",
         },
 
+        // Login
+        login: {
+            welcome: "Hoş Geldiniz",
+            subtitle: "Hesabınıza giriş yaparak devam edin",
+            admin: "Yönetici",
+            worker: "Personel",
+            username: "Kullanıcı Adı",
+            password: "Şifre",
+            adminLogin: "Yönetici Girişi",
+            workerLogin: "Personel Girişi",
+            loggingIn: "Giriş yapılıyor...",
+            loginFailed: "Giriş başarısız",
+            demo: "Demo",
+        },
+
         // Dashboard
         dashboard: {
             title: "Genel Bakış",
@@ -90,6 +105,8 @@ export const translations = {
             quickLook: "Hızlı Bakış",
             recentActivity: "Son Aktivite",
             noActivity: "Henüz aktivite yok",
+            loadingData: "Veri yükleniyor...",
+            connectionError: "Veri alınamadı",
         },
 
         // Toasts
@@ -146,7 +163,7 @@ export const translations = {
             date: "Date",
             description: "Description",
             category: "Category",
-            subCategory: "Sub Category",
+            subCategory: "Subcategory",
             amount: "Amount",
             type: "Type",
             currency: "Currency",
@@ -161,6 +178,21 @@ export const translations = {
             myPanel: "My Panel",
             addTransaction: "Add Transaction",
             logout: "Logout",
+        },
+
+        // Login
+        login: {
+            welcome: "Welcome",
+            subtitle: "Sign in to your account to continue",
+            admin: "Admin",
+            worker: "Staff",
+            username: "Username",
+            password: "Password",
+            adminLogin: "Admin Login",
+            workerLogin: "Staff Login",
+            loggingIn: "Signing in...",
+            loginFailed: "Login failed",
+            demo: "Demo",
         },
 
         // Dashboard
@@ -220,6 +252,8 @@ export const translations = {
             quickLook: "Quick Look",
             recentActivity: "Recent Activity",
             noActivity: "No activity yet",
+            loadingData: "Loading data...",
+            connectionError: "Could not load data",
         },
 
         // Toasts

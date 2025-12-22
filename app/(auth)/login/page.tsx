@@ -10,10 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Logo } from "@/components/best-holiday-ui/logo"
 import { useAuthStore } from "@/lib/store/auth-store"
+import { useTranslation } from "@/lib/store/language-store"
+import { LanguageToggle } from "@/components/language-toggle"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function LoginPage() {
     const router = useRouter()
     const login = useAuthStore((state) => state.login)
+    const { t } = useTranslation()
 
     const [adminUsername, setAdminUsername] = useState("")
     const [adminPassword, setAdminPassword] = useState("")
@@ -33,7 +37,7 @@ export default function LoginPage() {
         const result = login(username, password)
 
         if (!result.success) {
-            setError(result.error || "Giriş başarısız")
+            setError(result.error || t.login.loginFailed)
             setIsLoading(false)
             return
         }
@@ -49,6 +53,12 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+            {/* Language and Theme toggles */}
+            <div className="fixed top-4 right-4 flex items-center gap-1 z-50">
+                <LanguageToggle />
+                <ThemeToggle />
+            </div>
+
             {/* Background decorations */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
@@ -61,9 +71,9 @@ export default function LoginPage() {
                         <Logo size="lg" />
                     </div>
                     <div>
-                        <CardTitle className="text-2xl">Hoş Geldiniz</CardTitle>
+                        <CardTitle className="text-2xl">{t.login.welcome}</CardTitle>
                         <CardDescription className="mt-2">
-                            Hesabınıza giriş yaparak devam edin
+                            {t.login.subtitle}
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -72,11 +82,11 @@ export default function LoginPage() {
                         <TabsList className="grid w-full grid-cols-2 mb-6">
                             <TabsTrigger value="admin" className="gap-2">
                                 <Shield className="h-4 w-4" />
-                                Yönetici
+                                {t.login.admin}
                             </TabsTrigger>
                             <TabsTrigger value="worker" className="gap-2">
                                 <User className="h-4 w-4" />
-                                Personel
+                                {t.login.worker}
                             </TabsTrigger>
                         </TabsList>
 
@@ -86,7 +96,7 @@ export default function LoginPage() {
                                 handleLogin(adminUsername, adminPassword, 'admin')
                             }} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="admin-username">Kullanıcı Adı</Label>
+                                    <Label htmlFor="admin-username">{t.login.username}</Label>
                                     <Input
                                         id="admin-username"
                                         placeholder="admin"
@@ -96,7 +106,7 @@ export default function LoginPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="admin-password">Şifre</Label>
+                                    <Label htmlFor="admin-password">{t.login.password}</Label>
                                     <div className="relative">
                                         <Input
                                             id="admin-password"
@@ -124,14 +134,14 @@ export default function LoginPage() {
                                     {isLoading ? (
                                         <>
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Giriş yapılıyor...
+                                            {t.login.loggingIn}
                                         </>
                                     ) : (
-                                        "Yönetici Girişi"
+                                        t.login.adminLogin
                                     )}
                                 </Button>
                                 <p className="text-xs text-muted-foreground text-center">
-                                    Demo: admin / admin
+                                    {t.login.demo}: admin / admin
                                 </p>
                             </form>
                         </TabsContent>
@@ -142,7 +152,7 @@ export default function LoginPage() {
                                 handleLogin(workerUsername, workerPassword, 'worker')
                             }} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="worker-username">Kullanıcı Adı</Label>
+                                    <Label htmlFor="worker-username">{t.login.username}</Label>
                                     <Input
                                         id="worker-username"
                                         placeholder="user"
@@ -152,7 +162,7 @@ export default function LoginPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="worker-password">Şifre</Label>
+                                    <Label htmlFor="worker-password">{t.login.password}</Label>
                                     <div className="relative">
                                         <Input
                                             id="worker-password"
@@ -180,14 +190,14 @@ export default function LoginPage() {
                                     {isLoading ? (
                                         <>
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Giriş yapılıyor...
+                                            {t.login.loggingIn}
                                         </>
                                     ) : (
-                                        "Personel Girişi"
+                                        t.login.workerLogin
                                     )}
                                 </Button>
                                 <p className="text-xs text-muted-foreground text-center">
-                                    Demo: user / user
+                                    {t.login.demo}: user / user
                                 </p>
                             </form>
                         </TabsContent>
