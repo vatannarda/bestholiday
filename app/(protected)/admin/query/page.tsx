@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { aiQuery } from "@/lib/actions/n8n"
+import { aiQueryWithFile, aiQuery } from "@/lib/actions/n8n"
 import { useTranslation } from "@/lib/store/language-store"
 
 interface Message {
@@ -91,21 +91,6 @@ export default function QueryPage() {
         }
     }
 
-    // Convert file to base64
-    const fileToBase64 = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.readAsDataURL(file)
-            reader.onload = () => {
-                const result = reader.result as string
-                // Remove the data:mime;base64, prefix
-                const base64 = result.split(',')[1]
-                resolve(base64)
-            }
-            reader.onerror = reject
-        })
-    }
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!input.trim() && !selectedFile) return
@@ -123,15 +108,18 @@ export default function QueryPage() {
         setIsLoading(true)
 
         try {
-            let fileBase64: string | undefined
-            let fileName: string | undefined
+            let response
 
             if (selectedFile) {
-                fileBase64 = await fileToBase64(selectedFile)
-                fileName = selectedFile.name
+                // Use FormData for binary file upload
+                const formData = new FormData()
+                formData.append('chatInput', input || `Dosya analizi: ${selectedFile.name}`)
+                formData.append('file', selectedFile)
+                response = await aiQueryWithFile(formData)
+            } else {
+                // Text only
+                response = await aiQuery(input)
             }
-
-            const response = await aiQuery(input, fileBase64, fileName)
 
             // Clear file after sending
             removeFile()

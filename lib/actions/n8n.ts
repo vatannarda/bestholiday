@@ -192,40 +192,42 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 }
 
 /**
- * Send natural language transaction to n8n AI agent for parsing and saving
- * Example: "Ahmet'e 500 TL mazot parası verdim"
+ * Send transaction with file as multipart/form-data (binary upload)
+ * This sends the file as actual binary data, not base64
  */
-export async function addTransaction(text: string, fileBase64?: string, fileName?: string): Promise<N8NResponse> {
+export async function addTransactionWithFile(formData: FormData): Promise<N8NResponse> {
     try {
-        const body: Record<string, unknown> = {
-            text,
-            timestamp: new Date().toISOString()
+        // Extract text from formData
+        const text = formData.get('text') as string
+        const file = formData.get('file') as File | null
+
+        if (!text) {
+            return { success: false, error: 'Metin alanı boş olamaz' }
         }
 
-        // Add file data if provided
-        if (fileBase64 && fileName) {
-            body.file = {
-                data: fileBase64,
-                name: fileName,
-            }
+        // Create new FormData for webhook 
+        const webhookFormData = new FormData()
+        webhookFormData.append('text', text)
+        webhookFormData.append('timestamp', new Date().toISOString())
+
+        // Add file as binary if present
+        if (file && file.size > 0) {
+            webhookFormData.append('file', file, file.name)
         }
 
         const response = await fetch(N8N_TRANSACTION_WEBHOOK, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
+            // Don't set Content-Type header - browser will set it with boundary for FormData
+            body: webhookFormData,
         })
 
         if (!response.ok) {
             return { success: false, error: `HTTP ${response.status}` }
         }
 
-        // Try to parse response, but treat any 200 OK as success
+        // Try to parse response
         try {
             const data = await response.json()
-            // Check if response explicitly indicates failure
             if (data.success === false || data.error) {
                 return { success: false, error: data.error || 'İşlem başarısız' }
             }
@@ -250,29 +252,78 @@ export async function addTransaction(text: string, fileBase64?: string, fileName
 }
 
 /**
- * AI Query for the Analyst Chat interface (General Assistant)
- * Sends user message to n8n chatbot for AI-powered analysis
+ * Send natural language transaction to n8n AI agent for parsing and saving
+ * Example: "Ahmet'e 500 TL mazot parası verdim"
+ * For text-only transactions (backward compatible)
  */
-export async function aiQuery(userMessage: string, fileBase64?: string, fileName?: string): Promise<N8NResponse> {
+export async function addTransaction(text: string): Promise<N8NResponse> {
     try {
-        const body: Record<string, unknown> = {
-            chatInput: userMessage
-        }
-
-        // Add file data if provided
-        if (fileBase64 && fileName) {
-            body.file = {
-                data: fileBase64,
-                name: fileName,
-            }
-        }
-
-        const response = await fetch(N8N_CHATBOT_WEBHOOK, {
+        const response = await fetch(N8N_TRANSACTION_WEBHOOK, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+                text,
+                timestamp: new Date().toISOString()
+            }),
+        })
+
+        if (!response.ok) {
+            return { success: false, error: `HTTP ${response.status}` }
+        }
+
+        // Try to parse response
+        try {
+            const data = await response.json()
+            if (data.success === false || data.error) {
+                return { success: false, error: data.error || 'İşlem başarısız' }
+            }
+        } catch {
+            // If JSON parsing fails but we got 200 OK, still consider it successful
+        }
+
+        // Revalidate all pages to refresh data
+        revalidatePath('/')
+        revalidatePath('/admin/dashboard')
+        revalidatePath('/worker/dashboard')
+        revalidatePath('/transactions')
+
+        return { success: true }
+    } catch (error) {
+        console.error('N8N Transaction Error:', error)
+        return {
+            success: false,
+            error: 'Bağlantı hatası oluştu. Lütfen tekrar deneyin.'
+        }
+    }
+}
+
+/**
+ * AI Query with optional file attachment (binary upload)
+ * Sends user message to n8n chatbot for AI-powered analysis
+ */
+export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> {
+    try {
+        const chatInput = formData.get('chatInput') as string
+        const file = formData.get('file') as File | null
+
+        if (!chatInput) {
+            return { success: false, error: 'Mesaj boş olamaz' }
+        }
+
+        // Create FormData for webhook
+        const webhookFormData = new FormData()
+        webhookFormData.append('chatInput', chatInput)
+
+        // Add file as binary if present
+        if (file && file.size > 0) {
+            webhookFormData.append('file', file, file.name)
+        }
+
+        const response = await fetch(N8N_CHATBOT_WEBHOOK, {
+            method: 'POST',
+            body: webhookFormData,
         })
 
         if (!response.ok) {
@@ -281,7 +332,7 @@ export async function aiQuery(userMessage: string, fileBase64?: string, fileName
 
         const data = await response.json()
 
-        // Handle response format: { text: "...", success: true } or { output: "..." }
+        // Handle response format
         if (data.text !== undefined) {
             return {
                 success: data.success ?? true,
@@ -293,7 +344,47 @@ export async function aiQuery(userMessage: string, fileBase64?: string, fileName
             return { success: true, data: { output: data.output } }
         }
 
-        // Fallback for legacy format
+        return { success: true, data }
+    } catch (error) {
+        console.error('N8N Query Error:', error)
+        return {
+            success: false,
+            error: 'AI bağlantısı kurulamadı. Lütfen tekrar deneyin.'
+        }
+    }
+}
+
+/**
+ * AI Query for the Analyst Chat interface (text only - backward compatible)
+ */
+export async function aiQuery(userMessage: string): Promise<N8NResponse> {
+    try {
+        const response = await fetch(N8N_CHATBOT_WEBHOOK, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ chatInput: userMessage }),
+        })
+
+        if (!response.ok) {
+            return { success: false, error: `HTTP ${response.status}` }
+        }
+
+        const data = await response.json()
+
+        // Handle response format
+        if (data.text !== undefined) {
+            return {
+                success: data.success ?? true,
+                data: { output: data.text }
+            }
+        }
+
+        if (data.output !== undefined) {
+            return { success: true, data: { output: data.output } }
+        }
+
         return { success: true, data }
     } catch (error) {
         console.error('N8N Query Error:', error)

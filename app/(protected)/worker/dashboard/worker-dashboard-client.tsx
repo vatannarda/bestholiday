@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { PlusCircle, Sparkles, Receipt, Clock, Loader2 } from "lucide-react"
+import { PlusCircle, Sparkles, Receipt, Clock, Loader2, Upload, X, FileText } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,7 +26,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { useAuthStore } from "@/lib/store/auth-store"
-import { addTransaction } from "@/lib/actions/n8n"
+import { addTransactionWithFile, addTransaction } from "@/lib/actions/n8n"
 import { toast } from "sonner"
 
 const categories = [
@@ -148,10 +148,12 @@ function ManualFormFields({
 export function WorkerDashboardClient({ recentTransactions }: WorkerDashboardClientProps) {
     const router = useRouter()
     const user = useAuthStore((state) => state.user)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     // AI Input state
     const [aiInput, setAiInput] = useState("")
     const [aiLoading, setAiLoading] = useState(false)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
     // Manual form state
     const [manualForm, setManualForm] = useState({
@@ -163,19 +165,56 @@ export function WorkerDashboardClient({ recentTransactions }: WorkerDashboardCli
     })
     const [manualLoading, setManualLoading] = useState(false)
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            // Check file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error("Dosya Çok Büyük", {
+                    description: "Maksimum dosya boyutu 10MB olabilir.",
+                })
+                return
+            }
+            setSelectedFile(file)
+        }
+    }
+
+    const removeFile = () => {
+        setSelectedFile(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ""
+        }
+    }
+
     const handleAISubmit = async () => {
         if (!aiInput.trim()) return
 
         setAiLoading(true)
 
         try {
-            const response = await addTransaction(aiInput)
+            let response
+
+            if (selectedFile) {
+                // Use FormData for binary file upload
+                const formData = new FormData()
+                formData.append('text', aiInput)
+                formData.append('file', selectedFile)
+
+                response = await addTransactionWithFile(formData)
+            } else {
+                // Text only
+                response = await addTransaction(aiInput)
+            }
 
             if (response.success) {
                 toast.success("İşlem Başarıyla Eklendi", {
                     description: "Sayfa yenileniyor...",
                 })
                 setAiInput("")
+                setSelectedFile(null)
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = ""
+                }
                 setTimeout(() => {
                     router.refresh()
                 }, 1000)
@@ -294,6 +333,52 @@ export function WorkerDashboardClient({ recentTransactions }: WorkerDashboardCli
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         n8n webhook&apos;u yazınızı analiz edip PostgreSQL&apos;e kaydedecektir.
+                                    </p>
+                                </div>
+
+                                {/* File Upload Section */}
+                                <div className="space-y-2">
+                                    <Label>Dosya Ekle (Opsiyonel)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            onChange={handleFileSelect}
+                                            className="hidden"
+                                            accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx"
+                                            disabled={aiLoading}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={aiLoading}
+                                            className="gap-2"
+                                        >
+                                            <Upload className="h-4 w-4" />
+                                            Dosya Seç
+                                        </Button>
+                                        {selectedFile && (
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md">
+                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm truncate max-w-[200px]">{selectedFile.name}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    ({(selectedFile.size / 1024).toFixed(1)} KB)
+                                                </span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5"
+                                                    onClick={removeFile}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        PDF, resim veya Excel dosyası ekleyebilirsiniz. Dosya binary olarak webhook&apos;a gönderilir.
                                     </p>
                                 </div>
 
