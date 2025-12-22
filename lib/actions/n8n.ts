@@ -1,11 +1,40 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 
 // HARDCODED Webhook URLs
 const N8N_TRANSACTION_WEBHOOK = 'https://n8n.globaltripmarket.com/webhook/islem-ekle'
 const N8N_CHATBOT_WEBHOOK = 'https://n8n.globaltripmarket.com/webhook/chatbot'
 const N8N_DASHBOARD_DATA_WEBHOOK = 'https://n8n.globaltripmarket.com/webhook/dashboard-data'
+
+/**
+ * Get client IP address from request headers
+ * Works with proxies, load balancers, and direct connections
+ */
+async function getClientIP(): Promise<string> {
+    try {
+        const headersList = await headers()
+        // Check various headers in order of priority
+        const forwardedFor = headersList.get('x-forwarded-for')
+        if (forwardedFor) {
+            // x-forwarded-for can contain multiple IPs, take the first one (client)
+            return forwardedFor.split(',')[0].trim()
+        }
+        const realIP = headersList.get('x-real-ip')
+        if (realIP) {
+            return realIP
+        }
+        // Vercel/Cloudflare specific headers
+        const cfConnectingIP = headersList.get('cf-connecting-ip')
+        if (cfConnectingIP) {
+            return cfConnectingIP
+        }
+        return 'unknown'
+    } catch {
+        return 'unknown'
+    }
+}
 
 export interface N8NResponse {
     success: boolean
@@ -59,13 +88,18 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     }
 
     try {
+        const clientIP = await getClientIP()
+
         // Use POST method as n8n webhooks typically require POST
         const response = await fetch(N8N_DASHBOARD_DATA_WEBHOOK, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ action: 'fetch' }),
+            body: JSON.stringify({
+                action: 'fetch',
+                clientIP,
+            }),
             cache: 'no-store', // Always fetch fresh data
         })
 
@@ -194,12 +228,14 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 /**
  * Send transaction with file as multipart/form-data (binary upload)
  * This sends the file as actual binary data, not base64
+ * Includes client IP address
  */
 export async function addTransactionWithFile(formData: FormData): Promise<N8NResponse> {
     try {
         // Extract text from formData
         const text = formData.get('text') as string
         const file = formData.get('file') as File | null
+        const clientIP = await getClientIP()
 
         if (!text) {
             return { success: false, error: 'Metin alanı boş olamaz' }
@@ -209,6 +245,7 @@ export async function addTransactionWithFile(formData: FormData): Promise<N8NRes
         const webhookFormData = new FormData()
         webhookFormData.append('text', text)
         webhookFormData.append('timestamp', new Date().toISOString())
+        webhookFormData.append('clientIP', clientIP)
 
         // Add file as binary if present
         if (file && file.size > 0) {
@@ -255,9 +292,12 @@ export async function addTransactionWithFile(formData: FormData): Promise<N8NRes
  * Send natural language transaction to n8n AI agent for parsing and saving
  * Example: "Ahmet'e 500 TL mazot parası verdim"
  * For text-only transactions (backward compatible)
+ * Includes client IP address
  */
 export async function addTransaction(text: string): Promise<N8NResponse> {
     try {
+        const clientIP = await getClientIP()
+
         const response = await fetch(N8N_TRANSACTION_WEBHOOK, {
             method: 'POST',
             headers: {
@@ -265,7 +305,8 @@ export async function addTransaction(text: string): Promise<N8NResponse> {
             },
             body: JSON.stringify({
                 text,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                clientIP,
             }),
         })
 
@@ -302,11 +343,13 @@ export async function addTransaction(text: string): Promise<N8NResponse> {
 /**
  * AI Query with optional file attachment (binary upload)
  * Sends user message to n8n chatbot for AI-powered analysis
+ * Includes client IP address
  */
 export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> {
     try {
         const chatInput = formData.get('chatInput') as string
         const file = formData.get('file') as File | null
+        const clientIP = await getClientIP()
 
         if (!chatInput) {
             return { success: false, error: 'Mesaj boş olamaz' }
@@ -315,6 +358,7 @@ export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> 
         // Create FormData for webhook
         const webhookFormData = new FormData()
         webhookFormData.append('chatInput', chatInput)
+        webhookFormData.append('clientIP', clientIP)
 
         // Add file as binary if present
         if (file && file.size > 0) {
@@ -356,15 +400,21 @@ export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> 
 
 /**
  * AI Query for the Analyst Chat interface (text only - backward compatible)
+ * Includes client IP address
  */
 export async function aiQuery(userMessage: string): Promise<N8NResponse> {
     try {
+        const clientIP = await getClientIP()
+
         const response = await fetch(N8N_CHATBOT_WEBHOOK, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ chatInput: userMessage }),
+            body: JSON.stringify({
+                chatInput: userMessage,
+                clientIP,
+            }),
         })
 
         if (!response.ok) {
