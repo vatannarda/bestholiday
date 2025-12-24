@@ -28,27 +28,30 @@ export default function UserPanelPage() {
 
     // Load user's transactions
     const loadData = useCallback(async (showToast = false) => {
+        // Critical Security: If user is not strictly defined, do not fetch data
+        if (!user || !user.id) {
+            setTransactions([])
+            setIsLoading(false)
+            return
+        }
+
         try {
             if (showToast) setIsRefreshing(true)
             const data = await fetchDashboardData()
 
-            // Security: Default to empty array. Only show data if user is authenticated and matches.
-            let userTransactions: Transaction[] = []
-
-            if (user) {
-                userTransactions = data.transactions.filter(t => {
-                    // Match by user ID
-                    if (t.created_by_user_id && user.id) {
-                        return t.created_by_user_id === user.id
-                    }
-                    // Fallback: Match by username/displayName
-                    if (t.created_by_name) {
-                        return t.created_by_name === user.username ||
-                            t.created_by_name === user.displayName
-                    }
-                    return false
-                })
-            }
+            // Filter to show only user's own transactions
+            const userTransactions = data.transactions.filter(t => {
+                // strict match by user ID
+                if (t.created_by_user_id) {
+                    return String(t.created_by_user_id) === String(user.id)
+                }
+                // Fallback: Match by exact username
+                if (t.created_by_name) {
+                    return t.created_by_name === user.username ||
+                        t.created_by_name === user.displayName
+                }
+                return false
+            })
 
             // Show only latest 5 for the panel
             setTransactions(userTransactions.slice(0, 5))

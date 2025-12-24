@@ -85,27 +85,30 @@ export default function UserTransactionsPage() {
 
     // Load data from webhook
     const loadData = useCallback(async (showIndicator = false) => {
+        // Critical Security: If user is not strictly defined, do not fetch data
+        if (!user || !user.id) {
+            setTransactions([])
+            setIsLoading(false)
+            return
+        }
+
         try {
             if (showIndicator) setIsRefreshing(true)
             const data = await fetchDashboardData()
 
-            // User panel: Security - Default to empty array
-            let userTransactions: Transaction[] = []
-
-            if (user) {
-                userTransactions = data.transactions.filter(t => {
-                    // Match by user ID
-                    if (t.created_by_user_id && user.id) {
-                        return t.created_by_user_id === user.id
-                    }
-                    // Fallback: Match by username/displayName
-                    if (t.created_by_name) {
-                        return t.created_by_name === user.username ||
-                            t.created_by_name === user.displayName
-                    }
-                    return false
-                })
-            }
+            // User panel: Always filter to show only user's own transactions
+            const userTransactions = data.transactions.filter(t => {
+                // Strict match by user ID
+                if (t.created_by_user_id) {
+                    return String(t.created_by_user_id) === String(user.id)
+                }
+                // Fallback: Match by username/displayName
+                if (t.created_by_name) {
+                    return t.created_by_name === user.username ||
+                        t.created_by_name === user.displayName
+                }
+                return false
+            })
 
             setTransactions(userTransactions)
             setSubCategories(data.subCategories)

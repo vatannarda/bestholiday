@@ -42,11 +42,30 @@ export default function WorkerDashboard() {
 
     // Fetch data from webhook
     const loadData = useCallback(async (showToast = false) => {
+        // Critical Security: If user is not strictly defined, do not fetch data
+        if (!user || !user.id) {
+            setTransactions([])
+            setIsDataLoading(false)
+            return
+        }
+
         try {
             if (showToast) setIsRefreshing(true)
 
             const data = await fetchDashboardData()
-            setTransactions(data.transactions.slice(0, 10))
+
+            // Filter to show only worker's own transactions
+            const myTransactions = data.transactions.filter(t => {
+                if (t.created_by_user_id) {
+                    return String(t.created_by_user_id) === String(user.id)
+                }
+                if (t.created_by_name) {
+                    return t.created_by_name === user.username || t.created_by_name === user.displayName
+                }
+                return false
+            })
+
+            setTransactions(myTransactions.slice(0, 10))
 
             if (showToast) {
                 toast.success(t.toast.dataUpdated)
