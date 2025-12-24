@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { aiQueryWithFile, aiQuery } from "@/lib/actions/n8n"
+import { useAuthStore } from "@/lib/store/auth-store"
 import { useTranslation } from "@/lib/store/language-store"
 
 interface Message {
@@ -110,15 +111,18 @@ export default function QueryPage() {
         try {
             let response
 
+            const user = useAuthStore.getState().user
+
             if (selectedFile) {
                 // Use FormData for binary file upload
                 const formData = new FormData()
                 formData.append('chatInput', input || `Dosya analizi: ${selectedFile.name}`)
                 formData.append('file', selectedFile)
+                if (user?.id) formData.append('userId', user.id)
                 response = await aiQueryWithFile(formData)
             } else {
                 // Text only
-                response = await aiQuery(input)
+                response = await aiQuery(input, user?.id)
             }
 
             // Clear file after sending

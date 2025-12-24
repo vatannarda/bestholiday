@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { aiQueryWithFile, aiQuery } from "@/lib/actions/n8n"
+import { useAuthStore } from "@/lib/store/auth-store"
 import { useTranslation } from "@/lib/store/language-store"
 import { toast } from "sonner"
 
@@ -110,13 +111,16 @@ export default function AccountingAIPage() {
         try {
             let response
 
+            const user = useAuthStore.getState().user
+
             if (selectedFile) {
                 const formData = new FormData()
                 formData.append('chatInput', input || `Dosya analizi: ${selectedFile.name}`)
                 formData.append('file', selectedFile)
+                if (user?.id) formData.append('userId', user.id)
                 response = await aiQueryWithFile(formData)
             } else {
-                response = await aiQuery(input)
+                response = await aiQuery(input, user?.id)
             }
 
             removeFile()
@@ -211,8 +215,8 @@ export default function AccountingAIPage() {
                                         </Avatar>
                                     )}
                                     <div className={`max-w-[85%] sm:max-w-[75%] rounded-lg p-3 ${message.role === "user"
-                                            ? "bg-primary text-primary-foreground"
-                                            : "bg-muted"
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-muted"
                                         }`}>
                                         {message.fileName && (
                                             <Badge variant="secondary" className="mb-2 text-xs">

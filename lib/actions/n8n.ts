@@ -56,6 +56,10 @@ export interface Transaction {
     transaction_date: string
     created_at: string
     file_url?: string
+    createdBy?: {
+        name: string
+        role: string
+    }
 }
 
 export interface CurrencyStats {
@@ -109,7 +113,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
         }
 
         const rawData = await response.json()
-        console.log('Webhook raw response:', JSON.stringify(rawData).slice(0, 500))
+
 
         // Parse the n8n response format - handle multiple possible structures
         let rawTransactions: Array<{
@@ -181,6 +185,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
                     transaction_date: t.transaction_date || t.created_at?.split('T')[0] || '',
                     created_at: t.created_at || '',
                     file_url: t.file_url,
+                    createdBy: (t as any).user_id || (t as any).userId || (t as any).created_by || (t as any).createdBy || (t as any).creator_id,
                 }
             })
             // Sort by transaction_date (newest first)
@@ -228,13 +233,14 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 /**
  * Send transaction with file as multipart/form-data (binary upload)
  * This sends the file as actual binary data, not base64
- * Includes client IP address
+ * Includes client IP address and User ID
  */
 export async function addTransactionWithFile(formData: FormData): Promise<N8NResponse> {
     try {
         // Extract text from formData
         const text = formData.get('text') as string
         const file = formData.get('file') as File | null
+        const userId = formData.get('userId') as string
         const clientIP = await getClientIP()
 
         if (!text) {
@@ -246,6 +252,7 @@ export async function addTransactionWithFile(formData: FormData): Promise<N8NRes
         webhookFormData.append('text', text)
         webhookFormData.append('timestamp', new Date().toISOString())
         webhookFormData.append('clientIP', clientIP)
+        if (userId) webhookFormData.append('userId', userId)
 
         // Add file as binary if present
         if (file && file.size > 0) {
@@ -292,9 +299,9 @@ export async function addTransactionWithFile(formData: FormData): Promise<N8NRes
  * Send natural language transaction to n8n AI agent for parsing and saving
  * Example: "Ahmet'e 500 TL mazot parası verdim"
  * For text-only transactions (backward compatible)
- * Includes client IP address
+ * Includes client IP address and User ID
  */
-export async function addTransaction(text: string): Promise<N8NResponse> {
+export async function addTransaction(text: string, userId?: string): Promise<N8NResponse> {
     try {
         const clientIP = await getClientIP()
 
@@ -307,6 +314,7 @@ export async function addTransaction(text: string): Promise<N8NResponse> {
                 text,
                 timestamp: new Date().toISOString(),
                 clientIP,
+                userId,
             }),
         })
 
@@ -343,12 +351,13 @@ export async function addTransaction(text: string): Promise<N8NResponse> {
 /**
  * AI Query with optional file attachment (binary upload)
  * Sends user message to n8n chatbot for AI-powered analysis
- * Includes client IP address
+ * Includes client IP address and User ID
  */
 export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> {
     try {
         const chatInput = formData.get('chatInput') as string
         const file = formData.get('file') as File | null
+        const userId = formData.get('userId') as string
         const clientIP = await getClientIP()
 
         if (!chatInput) {
@@ -359,6 +368,7 @@ export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> 
         const webhookFormData = new FormData()
         webhookFormData.append('chatInput', chatInput)
         webhookFormData.append('clientIP', clientIP)
+        if (userId) webhookFormData.append('userId', userId)
 
         // Add file as binary if present
         if (file && file.size > 0) {
@@ -400,9 +410,9 @@ export async function aiQueryWithFile(formData: FormData): Promise<N8NResponse> 
 
 /**
  * AI Query for the Analyst Chat interface (text only - backward compatible)
- * Includes client IP address
+ * Includes client IP address and User ID
  */
-export async function aiQuery(userMessage: string): Promise<N8NResponse> {
+export async function aiQuery(userMessage: string, userId?: string): Promise<N8NResponse> {
     try {
         const clientIP = await getClientIP()
 
@@ -414,6 +424,7 @@ export async function aiQuery(userMessage: string): Promise<N8NResponse> {
             body: JSON.stringify({
                 chatInput: userMessage,
                 clientIP,
+                userId,
             }),
         })
 

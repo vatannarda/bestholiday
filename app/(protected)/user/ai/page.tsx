@@ -9,8 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { aiQueryWithFile, aiQuery } from "@/lib/actions/n8n"
-import { useTranslation } from "@/lib/store/language-store"
 import { useAuthStore } from "@/lib/store/auth-store"
+import { useTranslation } from "@/lib/store/language-store"
+
 import { toast } from "sonner"
 
 interface Message {
@@ -120,9 +121,10 @@ export default function UserAIPage() {
                 const formData = new FormData()
                 formData.append('chatInput', input || `Dosya analizi: ${selectedFile.name}`)
                 formData.append('file', selectedFile)
+                if (user?.id) formData.append('userId', user.id)
                 response = await aiQueryWithFile(formData)
             } else {
-                response = await aiQuery(input)
+                response = await aiQuery(input, user?.id)
             }
 
             removeFile()

@@ -199,11 +199,12 @@ export function WorkerDashboardClient({ recentTransactions }: WorkerDashboardCli
                 const formData = new FormData()
                 formData.append('text', aiInput)
                 formData.append('file', selectedFile)
+                if (user?.id) formData.append('userId', user.id)
 
                 response = await addTransactionWithFile(formData)
             } else {
                 // Text only
-                response = await addTransaction(aiInput)
+                response = await addTransaction(aiInput, user?.id)
             }
 
             if (response.success) {
@@ -248,7 +249,7 @@ export function WorkerDashboardClient({ recentTransactions }: WorkerDashboardCli
         const text = `${manualForm.date} tarihinde ${manualForm.category} kategorisinde ${manualForm.amount} TL ${manualForm.type === 'INCOME' ? 'gelir' : 'gider'}: ${manualForm.description}`
 
         try {
-            const response = await addTransaction(text)
+            const response = await addTransaction(text, user?.id)
 
             if (response.success) {
                 toast.success("İşlem Başarıyla Eklendi", {

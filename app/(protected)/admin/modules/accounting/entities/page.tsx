@@ -7,7 +7,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import {
     Table,
     TableBody,
@@ -25,8 +42,8 @@ import {
 import { EmptyState } from "@/components/ui/empty-state"
 import { SkeletonTable } from "@/components/ui/skeleton"
 import { useTranslation } from "@/lib/store/language-store"
-import { getEntities } from "@/lib/api/entities"
-import type { Entity, EntityType } from "@/lib/api/types"
+import { getEntities, createEntity, toggleEntityStatus, deleteEntity } from "@/lib/api/entities"
+import type { Entity, EntityType, CreateEntityRequest } from "@/lib/api/types"
 import { ENTITY_TYPE_LABELS } from "@/lib/api/types"
 import { toast } from "sonner"
 
@@ -43,16 +60,32 @@ export default function EntitiesPage() {
     const [activeTab, setActiveTab] = useState<EntityType | 'all'>('all')
     const [searchQuery, setSearchQuery] = useState('')
 
+    // Create entity dialog state
+    const [isCreateOpen, setIsCreateOpen] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [newEntity, setNewEntity] = useState<CreateEntityRequest>({
+        type: 'customer',
+        name: '',
+        contactName: '',
+        phone: '',
+        email: '',
+        notes: '',
+    })
+
+
     const loadEntities = useCallback(async () => {
         setIsLoading(true)
         try {
             const response = await getEntities()
             if (response.success && response.data) {
-                setEntities(response.data.entities)
+                setEntities(response.data.entities || [])
+            } else {
+                setEntities([])
             }
         } catch (error) {
             console.error('Load entities error:', error)
             toast.error(t.toast.connectionError)
+            setEntities([])
         } finally {
             setIsLoading(false)
         }
@@ -62,8 +95,8 @@ export default function EntitiesPage() {
         loadEntities()
     }, [loadEntities])
 
-    // Filter entities by tab and search
-    const filteredEntities = entities.filter(entity => {
+    // Filter entities by tab and search - with null safety
+    const filteredEntities = (entities || []).filter(entity => {
         const matchesTab = activeTab === 'all' || entity.type === activeTab
         const matchesSearch = searchQuery === '' ||
             entity.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -89,10 +122,101 @@ export default function EntitiesPage() {
         }
     }
 
-    // Get entity count by type
+    // Get entity count by type - with null safety
     const getCountByType = (type: EntityType | 'all') => {
-        if (type === 'all') return entities.length
-        return entities.filter(e => e.type === type).length
+        const safeEntities = entities || []
+        if (type === 'all') return safeEntities.length
+        return safeEntities.filter(e => e.type === type).length
+    }
+
+    // Handle create entity
+    const handleCreate = async () => {
+        if (!newEntity.name.trim()) {
+            toast.error(language === 'tr' ? 'Cari adı zorunludur' : 'Entity name is required')
+            return
+        }
+
+        setIsSubmitting(true)
+        try {
+            const response = await createEntity(newEntity)
+            if (response.success) {
+                toast.success(language === 'tr' ? 'Cari hesap oluşturuldu' : 'Entity created successfully')
+                setIsCreateOpen(false)
+                setNewEntity({
+                    type: 'customer',
+                    name: '',
+                    contactName: '',
+                    phone: '',
+                    email: '',
+                    notes: '',
+                })
+                loadEntities()
+            } else {
+                toast.error(t.toast.error, { description: response.error })
+            }
+        } catch (error) {
+            console.error('Create entity error:', error)
+            toast.error(t.toast.connectionError)
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // Reset form when dialog closes
+    const handleDialogClose = (open: boolean) => {
+        setIsCreateOpen(open)
+        if (!open) {
+            setNewEntity({
+                type: 'customer',
+                name: '',
+                contactName: '',
+                phone: '',
+                email: '',
+                notes: '',
+            })
+        }
+    }
+
+    // Handle toggle entity status (active/inactive)
+    const handleToggle = async (id: string, entityName: string) => {
+        try {
+            const response = await toggleEntityStatus(id)
+            if (response.success) {
+                toast.success(language === 'tr'
+                    ? `${entityName} durumu güncellendi`
+                    : `${entityName} status updated`)
+                loadEntities()
+            } else {
+                toast.error(t.toast.error, { description: response.error })
+            }
+        } catch (error) {
+            console.error('Toggle entity error:', error)
+            toast.error(t.toast.connectionError)
+        }
+    }
+
+    // Handle delete entity
+    const handleDelete = async (id: string, entityName: string) => {
+        if (!confirm(language === 'tr'
+            ? `"${entityName}" cari hesabını silmek istediğinize emin misiniz?`
+            : `Are you sure you want to delete "${entityName}"?`)) {
+            return
+        }
+
+        try {
+            const response = await deleteEntity(id)
+            if (response.success) {
+                toast.success(language === 'tr'
+                    ? `${entityName} silindi`
+                    : `${entityName} deleted`)
+                loadEntities()
+            } else {
+                toast.error(t.toast.error, { description: response.error })
+            }
+        } catch (error) {
+            console.error('Delete entity error:', error)
+            toast.error(t.toast.connectionError)
+        }
     }
 
     return (
@@ -103,7 +227,7 @@ export default function EntitiesPage() {
                     <h2 className="text-2xl font-bold">{t.entities.title}</h2>
                     <p className="text-muted-foreground">{t.entities.subtitle}</p>
                 </div>
-                <Button onClick={() => toast.info('Yeni cari ekleme yakında')}>
+                <Button onClick={() => setIsCreateOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     {t.entities.addEntity}
                 </Button>
@@ -169,7 +293,7 @@ export default function EntitiesPage() {
                                     description={t.entities.noEntities}
                                     action={{
                                         label: t.entities.addEntity,
-                                        onClick: () => toast.info('Yeni cari ekleme yakında'),
+                                        onClick: () => setIsCreateOpen(true),
                                     }}
                                 />
                             </CardContent>
@@ -247,12 +371,30 @@ export default function EntitiesPage() {
                                                                         <MoreHorizontal className="h-4 w-4" />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuItem onClick={() => router.push(`/admin/modules/accounting/entities/${entity.id}`)}>
-                                                                        Detay Görüntüle
+                                                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                                    <DropdownMenuItem onSelect={(e) => {
+                                                                        e.preventDefault()
+                                                                        router.push(`/admin/modules/accounting/entities/${entity.id}`)
+                                                                    }}>
+                                                                        {language === 'tr' ? 'Görüntüle / Düzenle' : 'View / Edit'}
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => copyCode(entity.code)}>
-                                                                        Kodu Kopyala
+                                                                    <DropdownMenuItem onSelect={(e) => {
+                                                                        e.preventDefault()
+                                                                        handleToggle(entity.id, entity.name)
+                                                                    }}>
+                                                                        {entity.isActive
+                                                                            ? (language === 'tr' ? 'Pasife Al' : 'Deactivate')
+                                                                            : (language === 'tr' ? 'Aktif Et' : 'Activate')
+                                                                        }
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        onSelect={(e) => {
+                                                                            e.preventDefault()
+                                                                            handleDelete(entity.id, entity.name)
+                                                                        }}
+                                                                        className="text-destructive"
+                                                                    >
+                                                                        {language === 'tr' ? 'Sil' : 'Delete'}
                                                                     </DropdownMenuItem>
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
@@ -317,6 +459,128 @@ export default function EntitiesPage() {
                     )}
                 </TabsContent>
             </Tabs>
+
+            {/* Create Entity Dialog */}
+            <Dialog open={isCreateOpen} onOpenChange={handleDialogClose}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {language === 'tr' ? 'Yeni Cari Hesap' : 'New Entity'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {language === 'tr'
+                                ? 'Yeni müşteri, otel, araç sahibi veya alt acenta ekleyin.'
+                                : 'Add a new customer, hotel, vehicle owner, or sub agency.'
+                            }
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {/* Entity Type */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Cari Tipi' : 'Entity Type'}</Label>
+                            <Select
+                                value={newEntity.type}
+                                onValueChange={(value: EntityType) => setNewEntity({ ...newEntity, type: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="customer">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-4 w-4" />
+                                            {ENTITY_TYPE_LABELS.customer[language]}
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="hotel">
+                                        <div className="flex items-center gap-2">
+                                            <Building2 className="h-4 w-4" />
+                                            {ENTITY_TYPE_LABELS.hotel[language]}
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="vehicle_owner">
+                                        <div className="flex items-center gap-2">
+                                            <Car className="h-4 w-4" />
+                                            {ENTITY_TYPE_LABELS.vehicle_owner[language]}
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="sub_agency">
+                                        <div className="flex items-center gap-2">
+                                            <Building className="h-4 w-4" />
+                                            {ENTITY_TYPE_LABELS.sub_agency[language]}
+                                        </div>
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Entity Name */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Cari Adı' : 'Entity Name'} *</Label>
+                            <Input
+                                placeholder={language === 'tr' ? 'Örn: Ahmet Yılmaz, Grand Hotel' : 'e.g. John Doe, Grand Hotel'}
+                                value={newEntity.name}
+                                onChange={(e) => setNewEntity({ ...newEntity, name: e.target.value })}
+                            />
+                        </div>
+
+                        {/* Contact Name */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Yetkili Kişi' : 'Contact Name'}</Label>
+                            <Input
+                                placeholder={language === 'tr' ? 'Örn: Muhasebe Birimi' : 'e.g. Accounting Dept'}
+                                value={newEntity.contactName || ''}
+                                onChange={(e) => setNewEntity({ ...newEntity, contactName: e.target.value })}
+                            />
+                        </div>
+
+                        {/* Phone & Email */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>{language === 'tr' ? 'Telefon' : 'Phone'}</Label>
+                                <Input
+                                    placeholder="+90 5XX XXX XX XX"
+                                    value={newEntity.phone || ''}
+                                    onChange={(e) => setNewEntity({ ...newEntity, phone: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>E-posta</Label>
+                                <Input
+                                    type="email"
+                                    placeholder="ornek@email.com"
+                                    value={newEntity.email || ''}
+                                    onChange={(e) => setNewEntity({ ...newEntity, email: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Notlar' : 'Notes'}</Label>
+                            <Textarea
+                                placeholder={language === 'tr' ? 'Ek bilgiler...' : 'Additional notes...'}
+                                value={newEntity.notes || ''}
+                                onChange={(e) => setNewEntity({ ...newEntity, notes: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => handleDialogClose(false)}>
+                            {t.common.cancel}
+                        </Button>
+                        <Button onClick={handleCreate} disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                                <Plus className="h-4 w-4 mr-2" />
+                            )}
+                            {language === 'tr' ? 'Oluştur' : 'Create'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

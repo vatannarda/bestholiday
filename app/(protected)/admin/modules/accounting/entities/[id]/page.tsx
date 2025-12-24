@@ -2,10 +2,21 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Copy, Phone, Mail, Edit2, Plus, TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle } from "lucide-react"
+import { ArrowLeft, Copy, Phone, Mail, Edit2, Plus, TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import {
     Table,
     TableBody,
@@ -18,9 +29,9 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { SkeletonTable, SkeletonKPICards } from "@/components/ui/skeleton"
 import { useTranslation } from "@/lib/store/language-store"
 import { useAuthStore } from "@/lib/store/auth-store"
-import { getEntity } from "@/lib/api/entities"
+import { getEntity, updateEntity } from "@/lib/api/entities"
 import { getLedgerEntries, markAsPaid } from "@/lib/api/ledger"
-import type { Entity, EntityBalanceSummary, LedgerEntry } from "@/lib/api/types"
+import type { Entity, EntityBalanceSummary, LedgerEntry, UpdateEntityRequest } from "@/lib/api/types"
 import { ENTITY_TYPE_LABELS, LEDGER_STATUS_LABELS, MOVEMENT_TYPE_LABELS, LEDGER_STATUS_VARIANTS } from "@/lib/api/types"
 import { toast } from "sonner"
 
@@ -42,6 +53,17 @@ export default function EntityDetailPage() {
     const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
+    // Edit dialog state
+    const [isEditOpen, setIsEditOpen] = useState(false)
+    const [isUpdating, setIsUpdating] = useState(false)
+    const [editForm, setEditForm] = useState({
+        name: '',
+        contactName: '',
+        phone: '',
+        email: '',
+        notes: '',
+    })
+
     const loadData = useCallback(async () => {
         setIsLoading(true)
         try {
@@ -51,12 +73,12 @@ export default function EntityDetailPage() {
             ])
 
             if (entityRes.success && entityRes.data) {
-                setEntity(entityRes.data.entity)
+                setEntity(entityRes.data.entity || null)
                 setSummary(entityRes.data.summary || null)
             }
 
             if (ledgerRes.success && ledgerRes.data) {
-                setLedgerEntries(ledgerRes.data.entries)
+                setLedgerEntries(ledgerRes.data.entries || [])
                 if (ledgerRes.data.summary) {
                     setSummary(ledgerRes.data.summary)
                 }
@@ -93,6 +115,51 @@ export default function EntityDetailPage() {
             }
         } catch (error) {
             toast.error(t.toast.connectionError)
+        }
+    }
+
+    // Open edit dialog with current entity values
+    const openEditDialog = () => {
+        if (entity) {
+            setEditForm({
+                name: entity.name,
+                contactName: entity.contactName || '',
+                phone: entity.phone || '',
+                email: entity.email || '',
+                notes: entity.notes || '',
+            })
+            setIsEditOpen(true)
+        }
+    }
+
+    // Handle entity update
+    const handleUpdate = async () => {
+        if (!entity) return
+
+        setIsUpdating(true)
+        try {
+            const updateData: UpdateEntityRequest = {
+                id: entity.id,
+                name: editForm.name,
+                contactName: editForm.contactName || undefined,
+                phone: editForm.phone || undefined,
+                email: editForm.email || undefined,
+                notes: editForm.notes || undefined,
+            }
+
+            const response = await updateEntity(updateData)
+            if (response.success) {
+                toast.success(language === 'tr' ? 'Cari hesap güncellendi' : 'Entity updated')
+                setIsEditOpen(false)
+                loadData()
+            } else {
+                toast.error(t.toast.error, { description: response.error })
+            }
+        } catch (error) {
+            console.error('Update entity error:', error)
+            toast.error(t.toast.connectionError)
+        } finally {
+            setIsUpdating(false)
         }
     }
 
@@ -188,9 +255,9 @@ export default function EntityDetailPage() {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => toast.info('Düzenleme yakında')}>
+                            <Button variant="outline" onClick={openEditDialog}>
                                 <Edit2 className="h-4 w-4 mr-2" />
-                                Düzenle
+                                {language === 'tr' ? 'Düzenle' : 'Edit'}
                             </Button>
                         </div>
                     </div>
@@ -451,6 +518,81 @@ export default function EntityDetailPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Edit Entity Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {language === 'tr' ? 'Cari Hesap Düzenle' : 'Edit Entity'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {entity?.name} - {entity && ENTITY_TYPE_LABELS[entity.type][language]}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {/* Entity Name */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Cari Adı' : 'Entity Name'} *</Label>
+                            <Input
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            />
+                        </div>
+
+                        {/* Contact Name */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Yetkili Kişi' : 'Contact Name'}</Label>
+                            <Input
+                                value={editForm.contactName}
+                                onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })}
+                            />
+                        </div>
+
+                        {/* Phone & Email */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>{language === 'tr' ? 'Telefon' : 'Phone'}</Label>
+                                <Input
+                                    value={editForm.phone}
+                                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>E-posta</Label>
+                                <Input
+                                    type="email"
+                                    value={editForm.email}
+                                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2">
+                            <Label>{language === 'tr' ? 'Notlar' : 'Notes'}</Label>
+                            <Textarea
+                                value={editForm.notes}
+                                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                            {t.common.cancel}
+                        </Button>
+                        <Button onClick={handleUpdate} disabled={isUpdating || !editForm.name.trim()}>
+                            {isUpdating ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                                <Edit2 className="h-4 w-4 mr-2" />
+                            )}
+                            {language === 'tr' ? 'Güncelle' : 'Update'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
