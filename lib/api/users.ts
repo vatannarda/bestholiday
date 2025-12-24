@@ -4,7 +4,7 @@ export interface User {
     id: string
     username: string
     displayName: string
-    role: 'admin' | 'worker'
+    role: 'admin' | 'finance_admin' | 'finance_user'
     isActive: boolean
     createdAt?: string
     lastLogin?: string
@@ -13,7 +13,7 @@ export interface User {
 export interface CreateUserRequest {
     username: string
     displayName: string
-    role: 'admin' | 'worker'
+    role: 'admin' | 'finance_admin' | 'finance_user'
     password: string
 }
 

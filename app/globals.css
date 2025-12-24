@@ -2,74 +2,117 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 
+ * BestHoliday Enterprise Theme
+ * Finance/ERP visual identity with low saturation, high contrast
+ */
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* Core - Off-white foundation */
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+
+  /* Surface - Clean white cards */
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 213 94% 42%;
+  --popover-foreground: 222 47% 11%;
+
+  /* Primary - Deep navy (kurumsal) */
+  --primary: 213 50% 23%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 24 95% 53%;
+
+  /* Secondary - Slate tones */
+  --secondary: 214 32% 91%;
+  --secondary-foreground: 222 47% 11%;
+
+  /* Muted - Soft slate */
+  --muted: 210 20% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  /* Accent - Muted amber (kontrollü vurgu) */
+  --accent: 38 92% 50%;
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
+
+  /* Semantic - Wine red destructive */
+  --destructive: 0 72% 41%;
   --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 213 94% 42%;
+
+  /* Borders - Subtle slate */
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 213 50% 23%;
   --radius: 0.5rem;
-  --chart-1: 12 76% 61%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 197 37% 24%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
-  --sidebar-background: 0 0% 98%;
-  --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-primary: 213 94% 42%;
+
+  /* Charts - Muted professional palette */
+  --chart-1: 213 50% 35%;
+  --chart-2: 160 45% 35%;
+  --chart-3: 38 70% 45%;
+  --chart-4: 280 40% 50%;
+  --chart-5: 340 50% 45%;
+
+  /* Sidebar - Light slate */
+  --sidebar-background: 210 20% 98%;
+  --sidebar-foreground: 215 25% 27%;
+  --sidebar-primary: 213 50% 23%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 4.8% 95.9%;
-  --sidebar-accent-foreground: 240 5.9% 10%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-ring: 213 94% 42%;
+  --sidebar-accent: 214 32% 93%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-border: 214 32% 91%;
+  --sidebar-ring: 213 50% 23%;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+  /* Core - Deep navy-black */
+  --background: 222 47% 5%;
+  --foreground: 210 40% 96%;
+
+  /* Surface - Elevated dark cards */
+  --card: 222 47% 8%;
+  --card-foreground: 210 40% 96%;
+  --popover: 222 47% 8%;
+  --popover-foreground: 210 40% 96%;
+
+  /* Primary - Brighter for dark contrast */
   --primary: 213 94% 55%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 24 95% 53%;
+  --primary-foreground: 222 47% 11%;
+
+  /* Secondary - Dark slate */
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 96%;
+
+  /* Muted - Deep slate */
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+
+  /* Accent - Amber for dark */
+  --accent: 38 92% 50%;
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 62.8% 30.6%;
+
+  /* Semantic - Visible red */
+  --destructive: 0 72% 45%;
   --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
+
+  /* Borders - Dark slate */
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
   --ring: 213 94% 55%;
-  --chart-1: 220 70% 50%;
+
+  /* Charts - Dark mode palette */
+  --chart-1: 213 70% 50%;
   --chart-2: 160 60% 45%;
-  --chart-3: 30 80% 55%;
+  --chart-3: 38 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
-  --sidebar-background: 240 5.9% 10%;
-  --sidebar-foreground: 240 4.8% 95.9%;
+
+  /* Sidebar - Deep navy */
+  --sidebar-background: 222 47% 5%;
+  --sidebar-foreground: 214 32% 80%;
   --sidebar-primary: 213 94% 55%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 240 4.8% 95.9%;
-  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-accent: 217 33% 12%;
+  --sidebar-accent-foreground: 214 32% 90%;
+  --sidebar-border: 217 33% 17%;
   --sidebar-ring: 213 94% 55%;
 }
 
@@ -120,4 +163,76 @@
 body {
   @apply bg-background text-foreground antialiased;
   font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* ===========================================
+   Professional UI Utilities
+   =========================================== */
+
+/* Tabular numbers for monetary values */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Amount display - right aligned, monospace numerals */
+.amount {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* Enhanced headings */
+.heading-enterprise {
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+
+/* Zebra striping for tables */
+.table-zebra tbody tr:nth-child(even) {
+  @apply bg-muted/30;
+}
+
+/* Professional card styling */
+.card-enterprise {
+  @apply border border-border/70 shadow-sm transition-shadow duration-200;
+}
+
+.card-enterprise:hover {
+  @apply shadow-md;
+}
+
+/* Status badges - muted enterprise colors */
+.badge-success-muted {
+  @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+}
+
+.dark .badge-success-muted {
+  @apply bg-emerald-950/30 text-emerald-400 border-emerald-800;
+}
+
+.badge-warning-muted {
+  @apply bg-amber-50 text-amber-700 border-amber-200;
+}
+
+.dark .badge-warning-muted {
+  @apply bg-amber-950/30 text-amber-400 border-amber-800;
+}
+
+.badge-error-muted {
+  @apply bg-red-50 text-red-700 border-red-200;
+}
+
+.dark .badge-error-muted {
+  @apply bg-red-950/30 text-red-400 border-red-800;
+}
+
+/* Sidebar section divider */
+.sidebar-divider {
+  @apply h-px bg-sidebar-border/50 my-3;
+}
+
+/* Footer branding */
+.footer-brand {
+  @apply text-[10px] text-muted-foreground/50 tracking-wide uppercase;
 }

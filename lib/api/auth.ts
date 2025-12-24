@@ -10,7 +10,7 @@ export interface LoginResponse {
         id: string
         username: string
         displayName: string
-        role: 'admin' | 'worker'
+        role: 'admin' | 'finance_admin' | 'finance_user'
         isActive: boolean
     }
     token?: string

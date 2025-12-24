@@ -14,15 +14,27 @@ import {
     DollarSign,
     Users,
     Activity,
+    Calculator,
+    Users2,
+    Clock,
+    Truck,
+    Home,
+    ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
 import { Logo } from "@/components/best-holiday-ui/logo"
-import { useAuthStore } from "@/lib/store/auth-store"
+import { useAuthStore, canSeeModulesPage, canSeeAllLedger } from "@/lib/store/auth-store"
 import { useTranslation } from "@/lib/store/language-store"
 import { cn } from "@/lib/utils"
 import { fetchDashboardData, type DashboardStats, type Transaction } from "@/lib/actions/n8n"
@@ -41,6 +53,7 @@ export default function ProtectedLayout({
     const { t, language } = useTranslation()
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [mounted, setMounted] = useState(false)
+    const [accountingOpen, setAccountingOpen] = useState(true)
 
     // Sidebar data state
     const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
@@ -53,18 +66,28 @@ export default function ProtectedLayout({
     const [isLoadingData, setIsLoadingData] = useState(true)
     const [dataError, setDataError] = useState(false)
 
-    // Dynamic nav items based on language
-    const adminNavItems = [
-        { title: t.nav.overview, href: "/admin/dashboard", icon: LayoutDashboard },
-        { title: t.nav.transactions, href: "/transactions", icon: Receipt },
-        { title: t.nav.aiAnalyst, href: "/admin/query", icon: MessageSquareText },
+    const isAdmin = user?.role === 'admin'
+
+    // Accounting module nav items
+    const accountingItems = [
+        { title: t.accounting.overview, href: "/admin/modules/accounting", icon: Calculator, exact: true, adminOnly: false },
+        { title: t.accounting.entities, href: "/admin/modules/accounting/entities", icon: Users2, adminOnly: true },
+        { title: t.accounting.due, href: "/admin/modules/accounting/due", icon: Clock, adminOnly: true },
+        { title: t.nav.transactions, href: "/admin/modules/accounting/transactions", icon: Receipt, adminOnly: false },
+        { title: t.nav.aiAnalyst, href: "/admin/modules/accounting/ai", icon: MessageSquareText, adminOnly: false },
+    ]
+
+    // Admin-only management items
+    const adminItems = [
         { title: t.nav.users, href: "/admin/users", icon: Users },
         { title: t.nav.activity, href: "/admin/activity", icon: Activity },
     ]
 
-    const workerNavItems = [
-        { title: t.nav.myPanel, href: "/worker/dashboard", icon: LayoutDashboard },
-        { title: t.nav.addTransaction, href: "/transactions", icon: Receipt },
+    // Worker/Finance user nav items - personal panel based
+    const financeNavItems = [
+        { title: language === 'tr' ? 'Panelim' : 'My Panel', href: "/user/panel", icon: Home },
+        { title: language === 'tr' ? 'İşlemlerim' : 'My Transactions', href: "/user/transactions", icon: Receipt },
+        { title: language === 'tr' ? 'AI Asistan' : 'AI Assistant', href: "/user/ai", icon: MessageSquareText },
     ]
 
     // Load sidebar data from webhook
@@ -95,8 +118,8 @@ export default function ProtectedLayout({
     useEffect(() => {
         // Role-based route protection
         if (mounted && user) {
-            if (user.role === 'worker' && pathname.startsWith('/admin')) {
-                router.push('/worker/dashboard')
+            if (user.role === 'finance_user' && pathname.startsWith('/admin')) {
+                router.push('/user/panel')
             }
         }
     }, [mounted, user, pathname, router])
@@ -125,8 +148,6 @@ export default function ProtectedLayout({
         )
     }
 
-    const navItems = user?.role === 'admin' ? adminNavItems : workerNavItems
-
     const handleLogout = () => {
         logout()
         router.push('/login')
@@ -141,6 +162,15 @@ export default function ProtectedLayout({
     const formatCurrency = (amount: number, currency: 'TRY' | 'USD' | 'EUR' = 'TRY') => {
         const symbols = { TRY: '₺', USD: '$', EUR: '€' }
         return `${symbols[currency]}${amount.toLocaleString('tr-TR')}`
+    }
+
+    // Check if any accounting route is active
+    const isAccountingActive = pathname.startsWith('/admin/modules/accounting')
+
+    // Helper for active check
+    const isActive = (href: string, exact?: boolean) => {
+        if (exact) return pathname === href
+        return pathname.startsWith(href)
     }
 
     return (
@@ -190,28 +220,129 @@ export default function ProtectedLayout({
                 {/* Navigation */}
                 <ScrollArea className="flex-1 py-4">
                     <nav className="space-y-1 px-3">
-                        {navItems.map((item) => {
-                            const isActive = pathname === item.href
-                            return (
+                        {/* Finance user navigation - direct to accounting module */}
+                        {!isAdmin && financeNavItems.map((item) => (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => {
+                                    if (window.innerWidth < 768) setSidebarOpen(false)
+                                }}
+                                className={cn(
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                                    isActive(item.href, true)
+                                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                )}
+                            >
+                                <item.icon className="h-5 w-5 shrink-0" />
+                                {sidebarOpen && <span>{item.title}</span>}
+                            </Link>
+                        ))}
+
+                        {/* Admin navigation - modular */}
+                        {isAdmin && (
+                            <>
+                                {/* Master Panel Home */}
                                 <Link
-                                    key={item.href}
-                                    href={item.href}
+                                    href="/admin"
                                     onClick={() => {
-                                        // Close sidebar on mobile after click
                                         if (window.innerWidth < 768) setSidebarOpen(false)
                                     }}
                                     className={cn(
                                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
-                                        isActive
+                                        pathname === '/admin'
                                             ? "bg-sidebar-primary text-sidebar-primary-foreground"
                                             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                                     )}
                                 >
-                                    <item.icon className="h-5 w-5 shrink-0" />
-                                    {sidebarOpen && <span>{item.title}</span>}
+                                    <Home className="h-5 w-5 shrink-0" />
+                                    {sidebarOpen && <span>{t.masterPanel.modules}</span>}
                                 </Link>
-                            )
-                        })}
+
+                                {/* Accounting Module - Collapsible */}
+                                {sidebarOpen ? (
+                                    <Collapsible open={accountingOpen} onOpenChange={setAccountingOpen}>
+                                        <CollapsibleTrigger className={cn(
+                                            "flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                                            isAccountingActive
+                                                ? "bg-sidebar-primary/10 text-sidebar-primary-foreground"
+                                                : "text-sidebar-foreground hover:bg-sidebar-accent"
+                                        )}>
+                                            <div className="flex items-center gap-3">
+                                                <Calculator className="h-5 w-5 shrink-0" />
+                                                <span>{t.masterPanel.accountingModule}</span>
+                                            </div>
+                                            <ChevronDown className={cn(
+                                                "h-4 w-4 transition-transform",
+                                                accountingOpen && "rotate-180"
+                                            )} />
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                                            {accountingItems
+                                                .filter(item => !item.adminOnly || isAdmin)
+                                                .map((item) => (
+                                                    <Link
+                                                        key={item.href}
+                                                        href={item.href}
+                                                        onClick={() => {
+                                                            if (window.innerWidth < 768) setSidebarOpen(false)
+                                                        }}
+                                                        className={cn(
+                                                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                                                            isActive(item.href, item.exact)
+                                                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                                                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                                        )}
+                                                    >
+                                                        <item.icon className="h-4 w-4 shrink-0" />
+                                                        <span>{item.title}</span>
+                                                    </Link>
+                                                ))}
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                ) : (
+                                    <Link
+                                        href="/admin/modules/accounting"
+                                        className={cn(
+                                            "flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                                            isAccountingActive
+                                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                                : "text-sidebar-foreground hover:bg-sidebar-accent"
+                                        )}
+                                    >
+                                        <Calculator className="h-5 w-5" />
+                                    </Link>
+                                )}
+
+                                <Separator className="my-3" />
+
+                                {/* Admin Management */}
+                                {sidebarOpen && (
+                                    <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider px-3 mb-2">
+                                        {t.nav.management}
+                                    </p>
+                                )}
+                                {adminItems.map((item) => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={() => {
+                                            if (window.innerWidth < 768) setSidebarOpen(false)
+                                        }}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                                            isActive(item.href)
+                                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                        )}
+                                    >
+                                        <item.icon className="h-5 w-5 shrink-0" />
+                                        {sidebarOpen && <span>{item.title}</span>}
+                                    </Link>
+                                ))}
+                            </>
+                        )}
                     </nav>
 
                     {/* Quick Stats for Admin - Multi-Currency */}
@@ -342,6 +473,14 @@ export default function ProtectedLayout({
                             <LogOut className="h-4 w-4" />
                         </Button>
                     )}
+                    {/* Footer Branding */}
+                    {sidebarOpen && (
+                        <div className="mt-4 pt-3 border-t border-sidebar-border/50">
+                            <p className="footer-brand text-center">
+                                BestHoliday Finance • v1.0
+                            </p>
+                        </div>
+                    )}
                 </div>
             </aside>
 
@@ -358,7 +497,11 @@ export default function ProtectedLayout({
                     <div className="flex items-center justify-between h-full px-6 md:px-6 pl-16 md:pl-6">
                         <div>
                             <h1 className="text-lg font-semibold">
-                                {navItems.find((item) => item.href === pathname)?.title || 'Panel'}
+                                {pathname === '/admin' && t.masterPanel.modules}
+                                {pathname.startsWith('/admin/modules/accounting') && t.masterPanel.accountingModule}
+                                {pathname === '/admin/users' && t.nav.users}
+                                {pathname === '/admin/activity' && t.nav.activity}
+                                {!pathname.startsWith('/admin') && 'Panel'}
                             </h1>
                         </div>
                         <div className="flex items-center gap-1">

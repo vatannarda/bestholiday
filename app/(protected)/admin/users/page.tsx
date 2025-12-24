@@ -61,7 +61,7 @@ export default function UsersPage() {
         username: "",
         displayName: "",
         password: "",
-        role: "worker" as "admin" | "worker",
+        role: "finance_user" as "admin" | "finance_admin" | "finance_user",
     })
 
     // Load users
@@ -102,7 +102,7 @@ export default function UsersPage() {
             if (response.success) {
                 toast.success(t.users.createSuccess)
                 setIsCreateOpen(false)
-                setNewUser({ username: "", displayName: "", password: "", role: "worker" })
+                setNewUser({ username: "", displayName: "", password: "", role: "finance_user" })
                 loadUsers()
             } else {
                 toast.error(t.toast.error, { description: response.error })
@@ -232,7 +232,7 @@ export default function UsersPage() {
                                             <Label>{t.users.role}</Label>
                                             <Select
                                                 value={newUser.role}
-                                                onValueChange={(value: "admin" | "worker") => setNewUser({ ...newUser, role: value })}
+                                                onValueChange={(value: "admin" | "finance_admin" | "finance_user") => setNewUser({ ...newUser, role: value })}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue />
@@ -240,14 +240,20 @@ export default function UsersPage() {
                                                 <SelectContent>
                                                     <SelectItem value="admin">
                                                         <div className="flex items-center gap-2">
-                                                            <Shield className="h-4 w-4" />
+                                                            <Shield className="h-4 w-4 text-primary" />
                                                             {t.users.admin}
                                                         </div>
                                                     </SelectItem>
-                                                    <SelectItem value="worker">
+                                                    <SelectItem value="finance_admin">
                                                         <div className="flex items-center gap-2">
-                                                            <UserIcon className="h-4 w-4" />
-                                                            {t.users.worker}
+                                                            <Shield className="h-4 w-4 text-amber-500" />
+                                                            {t.users.financeAdmin}
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="finance_user">
+                                                        <div className="flex items-center gap-2">
+                                                            <UserIcon className="h-4 w-4 text-blue-500" />
+                                                            {t.users.financeUser}
                                                         </div>
                                                     </SelectItem>
                                                 </SelectContent>

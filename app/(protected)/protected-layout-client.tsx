@@ -85,8 +85,8 @@ export function ProtectedLayoutClient({
     useEffect(() => {
         // Role-based route protection
         if (mounted && user) {
-            if (user.role === 'worker' && pathname.startsWith('/admin')) {
-                router.push('/worker/dashboard')
+            if (user.role === 'finance_user' && pathname.startsWith('/admin')) {
+                router.push('/user/panel')
             }
         }
     }, [mounted, user, pathname, router])
