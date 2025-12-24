@@ -162,21 +162,100 @@ export async function getLedgerEntries(entityId?: string): Promise<ApiResponse<L
     }
 
     const queryParams = entityId ? `?entityId=${entityId}` : ''
-    const response = await apiFetch<LedgerListResponse>(`/ledger${queryParams}`, {
+    // Use the N8N webhook URL directly or via proxy if needed
+    // Assuming apiFetch handles base URL
+    const response = await apiFetch<any>(`/ledger${queryParams}`, {
         method: 'GET',
     })
 
-    // Handle various response formats
-    if (response.success && response.data) {
-        if (Array.isArray(response.data)) {
-            return { success: true, data: { entries: response.data as unknown as LedgerEntry[] } }
-        }
-        if ((response.data as LedgerListResponse).entries) {
-            return response
-        }
+    if (!response.success) {
+        return { success: false, error: response.error }
     }
 
-    return response
+    // Parse N8N response format: [{ "data": [...] }] or just [...]
+    let rawEntries: any[] = []
+
+    if (Array.isArray(response.data)) {
+        if (response.data.length > 0 && response.data[0].data && Array.isArray(response.data[0].data)) {
+            // Format: [{ "data": [...] }]
+            rawEntries = response.data[0].data
+        } else {
+            // Format: [...] (direct array)
+            rawEntries = response.data
+        }
+    } else if (response.data && (response.data as any).data && Array.isArray((response.data as any).data)) {
+        // Format: { "data": [...] }
+        rawEntries = (response.data as any).data
+    } else if (response.data && (response.data as any).entries) {
+        // Legacy or typed format
+        return { success: true, data: response.data as any }
+    }
+
+    // Map snake_case to camelCase
+    const entries: LedgerEntry[] = rawEntries.map((item: any) => ({
+        id: item.id,
+        entityId: item.entity_id,
+        entityName: item.entity_name, // Mapped from API
+        movementType: item.movement_type,
+        amount: typeof item.amount === 'string' ? parseFloat(item.amount) : item.amount,
+        currency: item.currency,
+        status: item.status,
+        date: item.date,
+        dueDate: item.due_date || undefined,
+        reference: item.reference || undefined,
+        description: item.description || '',
+        operationId: item.operation_id || undefined,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        createdBy: item.created_by_user_id ? {
+            id: String(item.created_by_user_id),
+            name: item.created_by_name || item.created_by_username || item.username || 'User',
+            role: item.created_by_role || 'finance_user'
+        } : undefined
+    }))
+
+    // Generate summary from entries
+    const byCurrency: Record<string, { receivable: number; payable: number }> = {}
+    let overdueCount = 0
+    let upcomingDueCount = 0
+    const today = new Date()
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+    entries.forEach(entry => {
+        if (!byCurrency[entry.currency]) {
+            byCurrency[entry.currency] = { receivable: 0, payable: 0 }
+        }
+        if (entry.movementType === 'receivable' || entry.movementType === 'income') {
+            byCurrency[entry.currency].receivable += entry.amount
+        } else {
+            byCurrency[entry.currency].payable += entry.amount
+        }
+
+        if (entry.status === 'overdue') overdueCount++
+        else if (entry.dueDate && entry.status !== 'paid') {
+            const due = new Date(entry.dueDate)
+            if (due < today) overdueCount++ // Auto-detect overdue if status is not updated
+            else if (due <= nextWeek) upcomingDueCount++
+        }
+    })
+
+    return {
+        success: true,
+        data: {
+            entries,
+            summary: {
+                entityId: entityId || 'all',
+                byCurrency: Object.entries(byCurrency).map(([currency, vals]) => ({
+                    currency: currency as any,
+                    receivable: vals.receivable,
+                    payable: vals.payable,
+                    net: vals.receivable - vals.payable,
+                })),
+                overdueCount,
+                upcomingDueCount,
+            },
+        }
+    }
 }
 
 /**

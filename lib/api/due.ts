@@ -130,28 +130,53 @@ export async function getDueItems(params?: GetDueItemsParams): Promise<ApiRespon
         return { success: true, data: { upcoming, overdue } }
     }
 
-    // Build query string
-    const queryParts: string[] = []
-    if (params?.days) queryParts.push(`days=${params.days}`)
-    if (params?.status) queryParts.push(`status=${params.status}`)
-    if (params?.entityType) queryParts.push(`entityType=${params.entityType}`)
-    if (params?.entityId) queryParts.push(`entityId=${params.entityId}`)
-    if (params?.currency) queryParts.push(`currency=${params.currency}`)
+    // Use getLedgerEntries to fetch all data and filter for due items
+    // This ensures consistency with the main ledger
+    const { getLedgerEntries } = await import('./ledger')
+    const response = await getLedgerEntries(params?.entityId)
 
-    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : ''
-
-    const response = await apiFetch<DueListResponse>(`/due${queryString}`, {
-        method: 'GET',
-    })
-
-    // Handle various response formats
-    if (response.success && response.data) {
-        if ((response.data as DueListResponse).upcoming !== undefined) {
-            return response
-        }
+    if (!response.success || !response.data) {
+        return { success: false, error: response.error }
     }
 
-    return response
+    const { entries } = response.data
+    const today = new Date()
+
+    // Map to DueItem and filter
+    const allDueItems: DueItem[] = entries
+        .filter(entry => entry.dueDate && entry.status !== 'paid') // Only items with due dates and not paid
+        .map(entry => {
+            const due = new Date(entry.dueDate!)
+            // Calculate days diff: (Due - Today) / DayMs
+            const diffTime = due.getTime() - today.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+            return {
+                ...entry,
+                entityName: entry.entityName || 'Unknown Entity',
+                entityType: 'customer', // Default/Unknown if not provided
+                entityCode: '---', // Default/Unknown
+                daysUntilDue: diffDays
+            }
+        })
+
+    // Separate into upcoming and overdue
+    let upcoming = allDueItems.filter(i => i.daysUntilDue >= 0)
+    let overdue = allDueItems.filter(i => i.daysUntilDue < 0)
+
+    // Apply Client-side filters
+    if (params?.days) {
+        upcoming = upcoming.filter(i => i.daysUntilDue <= params.days!)
+    }
+
+    // Server-side status simulation (already split into lists)
+    if (params?.status === 'pending') {
+        overdue = []
+    } else if (params?.status === 'overdue') {
+        upcoming = []
+    }
+
+    return { success: true, data: { upcoming, overdue } }
 }
 
 /**

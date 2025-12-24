@@ -31,9 +31,27 @@ export default function UserPanelPage() {
         try {
             if (showToast) setIsRefreshing(true)
             const data = await fetchDashboardData()
-            // In production, this would be filtered by user ID on the backend
-            // For now, we show all transactions as demo
-            setTransactions(data.transactions.slice(0, 5))
+
+            // Filter to show only user's own transactions
+            let userTransactions = data.transactions
+
+            if (user) {
+                userTransactions = data.transactions.filter(t => {
+                    // Match by user ID
+                    if (t.created_by_user_id && user.id) {
+                        return t.created_by_user_id === user.id
+                    }
+                    // Fallback: Match by username/displayName
+                    if (t.created_by_name) {
+                        return t.created_by_name === user.username ||
+                            t.created_by_name === user.displayName
+                    }
+                    return false
+                })
+            }
+
+            // Show only latest 5 for the panel
+            setTransactions(userTransactions.slice(0, 5))
         } catch (error) {
             console.error('Data load error:', error)
             toast.error(t.toast.connectionError)
@@ -41,7 +59,7 @@ export default function UserPanelPage() {
             setIsLoading(false)
             setIsRefreshing(false)
         }
-    }, [t])
+    }, [t, user])
 
     useEffect(() => {
         loadData()

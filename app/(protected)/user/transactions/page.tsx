@@ -88,8 +88,26 @@ export default function UserTransactionsPage() {
         try {
             if (showIndicator) setIsRefreshing(true)
             const data = await fetchDashboardData()
-            // In production, this would be filtered by user ID on backend
-            setTransactions(data.transactions)
+
+            // User panel: Always filter to show only user's own transactions
+            let userTransactions = data.transactions
+
+            if (user) {
+                userTransactions = data.transactions.filter(t => {
+                    // Match by user ID
+                    if (t.created_by_user_id && user.id) {
+                        return t.created_by_user_id === user.id
+                    }
+                    // Fallback: Match by username/displayName
+                    if (t.created_by_name) {
+                        return t.created_by_name === user.username ||
+                            t.created_by_name === user.displayName
+                    }
+                    return false
+                })
+            }
+
+            setTransactions(userTransactions)
             setSubCategories(data.subCategories)
         } catch (error) {
             console.error('Data load error:', error)
@@ -98,7 +116,7 @@ export default function UserTransactionsPage() {
             setIsLoading(false)
             setIsRefreshing(false)
         }
-    }, [t])
+    }, [t, user])
 
     useEffect(() => {
         loadData()

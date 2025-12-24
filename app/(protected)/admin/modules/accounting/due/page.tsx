@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Clock, AlertTriangle, Calendar, Users2, Building2, Car, CheckCircle, Loader2, Filter } from "lucide-react"
+import { Clock, AlertTriangle, Calendar, Users2, Building2, Car, CheckCircle, Loader2, Filter, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -40,9 +40,14 @@ export default function DuePage() {
     const [overdue, setOverdue] = useState<DueItem[]>([])
     const [daysFilter, setDaysFilter] = useState<number>(14)
     const [entityTypeFilter, setEntityTypeFilter] = useState<string>('all')
+    const [isRefreshing, setIsRefreshing] = useState(false)
 
-    const loadData = useCallback(async () => {
-        setIsLoading(true)
+    const loadData = useCallback(async (showRefresh = false) => {
+        if (showRefresh) {
+            setIsRefreshing(true)
+        } else {
+            setIsLoading(true)
+        }
         try {
             const response = await getDueItems({
                 days: daysFilter,
@@ -58,8 +63,13 @@ export default function DuePage() {
             toast.error(t.toast.connectionError)
         } finally {
             setIsLoading(false)
+            setIsRefreshing(false)
         }
     }, [daysFilter, entityTypeFilter, t])
+
+    const handleRefresh = () => {
+        loadData(true)
+    }
 
     useEffect(() => {
         loadData()
@@ -179,6 +189,15 @@ export default function DuePage() {
                     <h2 className="text-2xl font-bold">{t.dueTracking.title}</h2>
                     <p className="text-muted-foreground">{t.dueTracking.subtitle}</p>
                 </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {t.common.refresh}
+                </Button>
             </div>
 
             {/* Filters */}

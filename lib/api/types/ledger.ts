@@ -18,6 +18,7 @@ export interface LedgerEntry {
     reference?: string        // Referans: REZ-2024-001, FAT-123
     description?: string
     operationId?: string      // Operasyon bağlantısı (ileride Transfer Modülü ile)
+    entityName?: string       // API'den gelen entity_name
     createdBy?: {
         id: string
         name: string

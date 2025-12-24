@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Copy, Phone, Mail, Edit2, Plus, TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Copy, Phone, Mail, Edit2, Plus, TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle, Loader2, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +52,7 @@ export default function EntityDetailPage() {
     const [summary, setSummary] = useState<EntityBalanceSummary | null>(null)
     const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
 
     // Edit dialog state
     const [isEditOpen, setIsEditOpen] = useState(false)
@@ -64,8 +65,12 @@ export default function EntityDetailPage() {
         notes: '',
     })
 
-    const loadData = useCallback(async () => {
-        setIsLoading(true)
+    const loadData = useCallback(async (showRefresh = false) => {
+        if (showRefresh) {
+            setIsRefreshing(true)
+        } else {
+            setIsLoading(true)
+        }
         try {
             const [entityRes, ledgerRes] = await Promise.all([
                 getEntity(entityId),
@@ -88,8 +93,13 @@ export default function EntityDetailPage() {
             toast.error(t.toast.connectionError)
         } finally {
             setIsLoading(false)
+            setIsRefreshing(false)
         }
     }, [entityId, t])
+
+    const handleRefresh = () => {
+        loadData(true)
+    }
 
     useEffect(() => {
         loadData()
@@ -255,6 +265,15 @@ export default function EntityDetailPage() {
                             </div>
                         </div>
                         <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {t.common.refresh}
+                            </Button>
                             <Button variant="outline" onClick={openEditDialog}>
                                 <Edit2 className="h-4 w-4 mr-2" />
                                 {language === 'tr' ? 'Düzenle' : 'Edit'}

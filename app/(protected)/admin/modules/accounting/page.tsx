@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, Wallet, Users2, Clock, AlertTriangle, ArrowRight } from "lucide-react"
+import { TrendingUp, Wallet, Users2, Clock, AlertTriangle, ArrowRight, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +10,9 @@ import { useTranslation } from "@/lib/store/language-store"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { getDueItems } from "@/lib/api/due"
 import { getEntities } from "@/lib/api/entities"
+import { getLedgerEntries } from "@/lib/api/ledger"
+import { fetchDashboardData, type Transaction, type Currency } from "@/lib/actions/n8n"
+import { calculateWeeklyStats, calculateExpenseDistribution } from "@/lib/utils/dashboard"
 import { SkeletonKPICards } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/ui/page-header"
 import { SectionHeader } from "@/components/ui/section-header"
@@ -77,11 +80,13 @@ const CHART_COLORS = [
 ]
 
 // Weekly Flow Bar Chart Component
-function WeeklyFlowChart() {
+function WeeklyFlowChart({ data }: { data: { name: string; gelir: number; gider: number }[] }) {
+    // Convert to WEEKLY_FLOW_DATA format for fallback
+    const chartData = data.length > 0 ? data.map(d => ({ day: d.name, income: d.gelir, expense: d.gider })) : WEEKLY_FLOW_DATA
     return (
         <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={WEEKLY_FLOW_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                     <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(215, 16%, 47%)" }} />
                     <YAxis className="text-xs" tick={{ fill: "hsl(215, 16%, 47%)" }} tickFormatter={(v) => `₺${(v / 1000).toFixed(0)}k`} />
@@ -102,13 +107,14 @@ function WeeklyFlowChart() {
 }
 
 // Expense Distribution Pie Chart Component
-function ExpenseDistributionChart() {
+function ExpenseDistributionChart({ data }: { data: { name: string; value: number; color: string }[] }) {
+    const chartData = data.length > 0 ? data : EXPENSE_DATA.map((d, i) => ({ ...d, color: CHART_COLORS[i] }))
     return (
         <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                     <Pie
-                        data={EXPENSE_DATA}
+                        data={chartData}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -118,8 +124,8 @@ function ExpenseDistributionChart() {
                         label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                         labelLine={false}
                     >
-                        {EXPENSE_DATA.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
                         ))}
                     </Pie>
                     <Tooltip
@@ -150,6 +156,9 @@ export default function AccountingOverview() {
     const isAdmin = user?.role === 'admin'
 
     const [isLoading, setIsLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [weeklyData, setWeeklyData] = useState<{ name: string; gelir: number; gider: number }[]>([])
+    const [expenseData, setExpenseData] = useState<{ name: string; value: number; color: string }[]>([])
     const [stats, setStats] = useState({
         totalEntities: 0,
         overdueCount: 0,
@@ -161,33 +170,87 @@ export default function AccountingOverview() {
         }
     })
 
-    const loadData = useCallback(async () => {
-        setIsLoading(true)
+    const loadData = useCallback(async (showRefresh = false) => {
+        if (showRefresh) {
+            setIsRefreshing(true)
+        } else {
+            setIsLoading(true)
+        }
         try {
-            const [entitiesRes, dueRes] = await Promise.all([
+            const [entitiesRes, dueRes, ledgerRes, dashboardData] = await Promise.all([
                 getEntities(),
                 getDueItems({ days: 14 }),
+                getLedgerEntries(),
+                fetchDashboardData(),
             ])
 
             const entities = entitiesRes.data?.entities || []
             const due = dueRes.data
 
+            // Start with dashboard stats (normal transactions)
+            const balances = {
+                TRY: { receivable: dashboardData.stats.TRY.income, payable: dashboardData.stats.TRY.expense, net: 0 },
+                USD: { receivable: dashboardData.stats.USD.income, payable: dashboardData.stats.USD.expense, net: 0 },
+                EUR: { receivable: dashboardData.stats.EUR.income, payable: dashboardData.stats.EUR.expense, net: 0 },
+            }
+
+            // Add ledger entries to balances
+            if (ledgerRes.success && ledgerRes.data?.entries) {
+                for (const entry of ledgerRes.data.entries) {
+                    const curr = (entry.currency || 'TRY') as 'TRY' | 'USD' | 'EUR'
+                    if (entry.movementType === 'receivable' || entry.movementType === 'income') {
+                        balances[curr].receivable += entry.amount
+                    } else {
+                        balances[curr].payable += entry.amount
+                    }
+                }
+            }
+
+            // Calculate net for each currency
+            balances.TRY.net = balances.TRY.receivable - balances.TRY.payable
+            balances.USD.net = balances.USD.receivable - balances.USD.payable
+            balances.EUR.net = balances.EUR.receivable - balances.EUR.payable
+
+            // Combine all transactions for chart calculation
+            const ledgerEntries = ledgerRes.success && ledgerRes.data?.entries ? ledgerRes.data.entries : []
+
+            // Convert ledger entries to Transaction format
+            const ledgerAsTransactions: Transaction[] = ledgerEntries.map(entry => ({
+                id: `ledger_${entry.id}`,
+                amount: entry.amount,
+                type: (entry.movementType === 'receivable' || entry.movementType === 'income') ? 'INCOME' as const : 'EXPENSE' as const,
+                category: entry.movementType === 'receivable' ? 'Alacak' :
+                    entry.movementType === 'payable' ? 'Borç' :
+                        entry.movementType === 'income' ? 'Gelir' : 'Gider',
+                description: entry.description || '',
+                currency: entry.currency as Currency,
+                transaction_date: entry.date,
+                created_at: entry.createdAt || entry.date,
+            }))
+
+            const allTransactions = [...dashboardData.transactions, ...ledgerAsTransactions]
+
+            // Use same calculation functions as dashboard
+            setWeeklyData(calculateWeeklyStats(allTransactions))
+            setExpenseData(calculateExpenseDistribution(allTransactions))
+
             setStats({
                 totalEntities: entities.length,
                 overdueCount: due?.overdue?.length || 0,
                 upcomingDueCount: due?.upcoming?.length || 0,
-                balances: {
-                    TRY: { receivable: 45000, payable: 18500, net: 26500 },
-                    USD: { receivable: 2500, payable: 1200, net: 1300 },
-                    EUR: { receivable: 800, payable: 0, net: 800 },
-                }
+                balances
             })
         } catch (error) {
             console.error('Load data error:', error)
         } finally {
             setIsLoading(false)
+            setIsRefreshing(false)
         }
     }, [])
+
+    const handleRefresh = () => {
+        loadData(true)
+    }
 
     useEffect(() => {
         loadData()
@@ -204,10 +267,21 @@ export default function AccountingOverview() {
     return (
         <div className="space-y-8">
             {/* Page Header */}
-            <PageHeader
-                title={t.accounting.overview}
-                description={t.accounting.overviewDesc}
-            />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <PageHeader
+                    title={t.accounting.overview}
+                    description={t.accounting.overviewDesc}
+                />
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {t.common.refresh}
+                </Button>
+            </div>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Total Balance TRY */}
                 <Card className="relative overflow-hidden">
@@ -295,7 +369,7 @@ export default function AccountingOverview() {
                         <CardDescription>{t.dashboard.weeklyDesc}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <WeeklyFlowChart />
+                        <WeeklyFlowChart data={weeklyData} />
                     </CardContent>
                 </Card>
 
@@ -306,7 +380,7 @@ export default function AccountingOverview() {
                         <CardDescription>{t.dashboard.expenseDistDesc}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <ExpenseDistributionChart />
+                        <ExpenseDistributionChart data={expenseData} />
                     </CardContent>
                 </Card>
             </div>

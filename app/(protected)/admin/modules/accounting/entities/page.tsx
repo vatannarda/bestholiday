@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Copy, Phone, Mail, MoreHorizontal, Loader2, Building2, Users, Car, Building } from "lucide-react"
+import { Plus, Search, Copy, Phone, Mail, MoreHorizontal, Loader2, Building2, Users, Car, Building, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -59,6 +59,7 @@ export default function EntitiesPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<EntityType | 'all'>('all')
     const [searchQuery, setSearchQuery] = useState('')
+    const [isRefreshing, setIsRefreshing] = useState(false)
 
     // Create entity dialog state
     const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -73,8 +74,12 @@ export default function EntitiesPage() {
     })
 
 
-    const loadEntities = useCallback(async () => {
-        setIsLoading(true)
+    const loadEntities = useCallback(async (showRefresh = false) => {
+        if (showRefresh) {
+            setIsRefreshing(true)
+        } else {
+            setIsLoading(true)
+        }
         try {
             const response = await getEntities()
             if (response.success && response.data) {
@@ -88,8 +93,13 @@ export default function EntitiesPage() {
             setEntities([])
         } finally {
             setIsLoading(false)
+            setIsRefreshing(false)
         }
     }, [t])
+
+    const handleRefresh = () => {
+        loadEntities(true)
+    }
 
     useEffect(() => {
         loadEntities()
@@ -227,10 +237,21 @@ export default function EntitiesPage() {
                     <h2 className="text-2xl font-bold">{t.entities.title}</h2>
                     <p className="text-muted-foreground">{t.entities.subtitle}</p>
                 </div>
-                <Button onClick={() => setIsCreateOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t.entities.addEntity}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                    >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {t.common.refresh}
+                    </Button>
+                    <Button onClick={() => setIsCreateOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t.entities.addEntity}
+                    </Button>
+                </div>
             </div>
 
             {/* Search */}

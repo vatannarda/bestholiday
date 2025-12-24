@@ -56,11 +56,13 @@ export interface Transaction {
     transaction_date: string
     created_at: string
     file_url?: string
-    createdBy?: {
-        name: string
-        role: string
-    }
+    created_by_name?: string
+    created_by_user_id?: string  // User ID of who created this transaction
+    due_date?: string            // Vade tarihi (from ledger)
+    is_from_ledger?: boolean     // Flag to identify ledger entries
 }
+
+
 
 export interface CurrencyStats {
     income: number
@@ -185,7 +187,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
                     transaction_date: t.transaction_date || t.created_at?.split('T')[0] || '',
                     created_at: t.created_at || '',
                     file_url: t.file_url,
-                    createdBy: (t as any).user_id || (t as any).userId || (t as any).created_by || (t as any).createdBy || (t as any).creator_id,
+                    created_by_name: (t as any).created_by_name || (t as any).created_by_username || (t as any).username,
+                    created_by_user_id: (t as any).created_by_user_id || (t as any).user_id || undefined,
                 }
             })
             // Sort by transaction_date (newest first)
@@ -215,9 +218,6 @@ export async function fetchDashboardData(): Promise<DashboardData> {
         stats.TRY.balance = stats.TRY.income - stats.TRY.expense
         stats.USD.balance = stats.USD.income - stats.USD.expense
         stats.EUR.balance = stats.EUR.income - stats.EUR.expense
-
-        console.log(`Processed ${transactions.length} transactions`)
-        console.log(`Stats: TRY=${stats.TRY.balance}, USD=${stats.USD.balance}, EUR=${stats.EUR.balance}`)
 
         return {
             transactions,

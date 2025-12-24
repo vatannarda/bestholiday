@@ -37,7 +37,8 @@ import { Logo } from "@/components/best-holiday-ui/logo"
 import { useAuthStore, canSeeModulesPage, canSeeAllLedger } from "@/lib/store/auth-store"
 import { useTranslation } from "@/lib/store/language-store"
 import { cn } from "@/lib/utils"
-import { fetchDashboardData, type DashboardStats, type Transaction } from "@/lib/actions/n8n"
+import { fetchDashboardData, type DashboardStats, type Transaction, type Currency } from "@/lib/actions/n8n"
+import { getLedgerEntries } from "@/lib/api/ledger"
 
 // Refresh interval: 5 minutes
 const REFRESH_INTERVAL = 5 * 60 * 1000
@@ -80,7 +81,6 @@ export default function ProtectedLayout({
     // Admin-only management items
     const adminItems = [
         { title: t.nav.users, href: "/admin/users", icon: Users },
-        { title: t.nav.activity, href: "/admin/activity", icon: Activity },
     ]
 
     // Worker/Finance user nav items - personal panel based
@@ -94,9 +94,60 @@ export default function ProtectedLayout({
     const loadSidebarData = useCallback(async () => {
         try {
             setDataError(false)
-            const data = await fetchDashboardData()
-            setDashboardStats(data.stats)
-            setRecentTransactions(data.transactions.slice(0, 5))
+
+            // Fetch both transactions and ledger entries
+            const [data, ledgerRes] = await Promise.all([
+                fetchDashboardData(),
+                getLedgerEntries()
+            ])
+
+            // Calculate combined stats (transactions + ledger)
+            const combinedStats: DashboardStats = { ...data.stats }
+
+            // Add ledger entries to stats
+            if (ledgerRes.success && ledgerRes.data?.entries) {
+                for (const entry of ledgerRes.data.entries) {
+                    const curr = (entry.currency || 'TRY') as Currency
+                    if (entry.movementType === 'receivable' || entry.movementType === 'income') {
+                        combinedStats[curr].income += entry.amount
+                    } else {
+                        combinedStats[curr].expense += entry.amount
+                    }
+                }
+                // Recalculate balances
+                combinedStats.TRY.balance = combinedStats.TRY.income - combinedStats.TRY.expense
+                combinedStats.USD.balance = combinedStats.USD.income - combinedStats.USD.expense
+                combinedStats.EUR.balance = combinedStats.EUR.income - combinedStats.EUR.expense
+            }
+
+            setDashboardStats(combinedStats)
+
+            // Combine transactions with ledger entries for recent activity
+            const ledgerAsTransactions: Transaction[] = ledgerRes.success && ledgerRes.data?.entries
+                ? ledgerRes.data.entries.map(entry => ({
+                    id: `ledger_${entry.id}`,
+                    amount: entry.amount,
+                    type: (entry.movementType === 'receivable' || entry.movementType === 'income') ? 'INCOME' as const : 'EXPENSE' as const,
+                    category: entry.movementType === 'receivable' ? 'Alacak' :
+                        entry.movementType === 'payable' ? 'Borç' :
+                            entry.movementType === 'income' ? 'Gelir' : 'Gider',
+                    description: entry.description || entry.entityName || 'Cari İşlem',
+                    currency: entry.currency as Currency,
+                    transaction_date: entry.date,
+                    created_at: entry.createdAt || entry.date,
+                }))
+                : []
+
+            // Merge and sort by date, take latest 5
+            const allTransactions = [...data.transactions, ...ledgerAsTransactions]
+                .sort((a, b) => {
+                    const dateA = new Date(a.transaction_date || a.created_at || 0).getTime()
+                    const dateB = new Date(b.transaction_date || b.created_at || 0).getTime()
+                    return dateB - dateA
+                })
+                .slice(0, 5)
+
+            setRecentTransactions(allTransactions)
         } catch (error) {
             console.error('Sidebar data load error:', error)
             setDataError(true)
@@ -203,9 +254,9 @@ export default function ProtectedLayout({
                 {/* Sidebar Header */}
                 <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
                     {sidebarOpen ? (
-                        <Logo size="sm" />
+                        <Logo size="sm" onClick={() => router.push('/admin/dashboard')} />
                     ) : (
-                        <Logo size="sm" showText={false} />
+                        <Logo size="sm" showText={false} onClick={() => router.push('/admin/dashboard')} />
                     )}
                     <Button
                         variant="ghost"
@@ -373,10 +424,10 @@ export default function ProtectedLayout({
 
                                 {/* TRY Stats */}
                                 <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10">
-                                    <span className="text-lg">₺</span>
-                                    <div className="flex-1">
+                                    <span className="text-lg w-5 text-center">₺</span>
+                                    <div className="flex-1 min-w-0">
                                         <p className="text-xs text-sidebar-foreground/60">TRY</p>
-                                        <p className={cn("text-sm font-semibold",
+                                        <p className={cn("text-sm font-semibold tabular-nums",
                                             dashboardStats.TRY.balance >= 0 ? "text-green-500" : "text-red-500"
                                         )}>
                                             {formatCurrency(dashboardStats.TRY.balance, 'TRY')}
@@ -386,10 +437,10 @@ export default function ProtectedLayout({
 
                                 {/* USD Stats */}
                                 <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-green-500/10">
-                                    <DollarSign className="h-4 w-4 text-green-600" />
-                                    <div className="flex-1">
+                                    <span className="text-lg w-5 text-center">$</span>
+                                    <div className="flex-1 min-w-0">
                                         <p className="text-xs text-sidebar-foreground/60">USD</p>
-                                        <p className={cn("text-sm font-semibold",
+                                        <p className={cn("text-sm font-semibold tabular-nums",
                                             dashboardStats.USD.balance >= 0 ? "text-green-500" : "text-red-500"
                                         )}>
                                             {formatCurrency(dashboardStats.USD.balance, 'USD')}
@@ -399,10 +450,10 @@ export default function ProtectedLayout({
 
                                 {/* EUR Stats */}
                                 <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/10">
-                                    <span className="text-lg">€</span>
-                                    <div className="flex-1">
+                                    <span className="text-lg w-5 text-center">€</span>
+                                    <div className="flex-1 min-w-0">
                                         <p className="text-xs text-sidebar-foreground/60">EUR</p>
-                                        <p className={cn("text-sm font-semibold",
+                                        <p className={cn("text-sm font-semibold tabular-nums",
                                             dashboardStats.EUR.balance >= 0 ? "text-green-500" : "text-red-500"
                                         )}>
                                             {formatCurrency(dashboardStats.EUR.balance, 'EUR')}
@@ -508,7 +559,6 @@ export default function ProtectedLayout({
                                 {pathname === '/admin' && t.masterPanel.modules}
                                 {pathname.startsWith('/admin/modules/accounting') && t.masterPanel.accountingModule}
                                 {pathname === '/admin/users' && t.nav.users}
-                                {pathname === '/admin/activity' && t.nav.activity}
                                 {!pathname.startsWith('/admin') && 'Panel'}
                             </h1>
                         </div>

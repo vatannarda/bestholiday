@@ -26,6 +26,7 @@ import {
     type DashboardStats,
     type Currency
 } from "@/lib/actions/n8n"
+import { getLedgerEntries } from "@/lib/api/ledger"
 import { calculateWeeklyStats, calculateExpenseDistribution, getCurrencySymbol } from "@/lib/utils/dashboard"
 import { useAuthStore } from "@/lib/store/auth-store"
 import { useTranslation } from "@/lib/store/language-store"
@@ -65,12 +66,54 @@ export default function AdminDashboard() {
         try {
             if (showRefreshToast) setIsRefreshing(true)
 
-            const data = await fetchDashboardData()
+            // Fetch both transactions and ledger entries
+            const [data, ledgerRes] = await Promise.all([
+                fetchDashboardData(),
+                getLedgerEntries()
+            ])
 
-            setStats(data.stats)
+            // Calculate combined stats (transactions + ledger)
+            const combinedStats: DashboardStats = { ...data.stats }
+
+            // Add ledger entries to stats
+            if (ledgerRes.success && ledgerRes.data?.entries) {
+                for (const entry of ledgerRes.data.entries) {
+                    const curr = (entry.currency || 'TRY') as Currency
+                    if (entry.movementType === 'receivable' || entry.movementType === 'income') {
+                        combinedStats[curr].income += entry.amount
+                    } else {
+                        combinedStats[curr].expense += entry.amount
+                    }
+                }
+                // Recalculate balances
+                combinedStats.TRY.balance = combinedStats.TRY.income - combinedStats.TRY.expense
+                combinedStats.USD.balance = combinedStats.USD.income - combinedStats.USD.expense
+                combinedStats.EUR.balance = combinedStats.EUR.income - combinedStats.EUR.expense
+            }
+
+            setStats(combinedStats)
+
+            // Combine transactions with ledger entries for charts
+            const ledgerAsTransactions = ledgerRes.success && ledgerRes.data?.entries
+                ? ledgerRes.data.entries.map(entry => ({
+                    id: `ledger_${entry.id}`,
+                    amount: entry.amount,
+                    type: (entry.movementType === 'receivable' || entry.movementType === 'income') ? 'INCOME' as const : 'EXPENSE' as const,
+                    category: entry.movementType === 'receivable' ? 'Alacak' :
+                        entry.movementType === 'payable' ? 'Borç' :
+                            entry.movementType === 'income' ? 'Gelir' : 'Gider',
+                    description: entry.description || entry.entityName || 'Cari İşlem',
+                    currency: entry.currency as Currency,
+                    transaction_date: entry.date,
+                    created_at: entry.createdAt || entry.date,
+                }))
+                : []
+
+            const allTransactions = [...data.transactions, ...ledgerAsTransactions] as typeof data.transactions
+
             setTransactions(data.transactions)
-            setWeeklyData(calculateWeeklyStats(data.transactions))
-            setExpenseData(calculateExpenseDistribution(data.transactions))
+            setWeeklyData(calculateWeeklyStats(allTransactions))
+            setExpenseData(calculateExpenseDistribution(allTransactions))
             setLastUpdated(new Date())
 
             if (showRefreshToast) {

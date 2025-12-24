@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BestHoliday Finans Paneli",
-  description: "BestHoliday Turizm - Dahili Muhasebe ve Finans Yönetim Paneli",
+  title: "BestHoliday Yönetim Paneli",
+  description: "BestHoliday Turizm - Dahili Muhasebe ve Yönetim Paneli",
 };
 
 export default function RootLayout({
