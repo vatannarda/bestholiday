@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { addTransaction } from "@/lib/actions/n8n"
+import { useAuthStore } from "@/lib/store/auth-store"
 import { toast } from "sonner"
 
 export function AdminAiInput() {
@@ -21,7 +22,8 @@ export function AdminAiInput() {
         setAiLoading(true)
 
         try {
-            const response = await addTransaction(aiInput)
+            const user = useAuthStore.getState().user
+            const response = await addTransaction(aiInput, user?.id)
 
             if (response.success) {
                 toast.success("İşlem Başarıyla Eklendi", {

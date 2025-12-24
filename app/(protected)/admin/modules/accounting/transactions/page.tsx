@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { SkeletonTable } from "@/components/ui/skeleton"
 import { TransactionCard } from "@/components/transaction-card"
 import { useAuthStore, canSeeCreatedByColumn } from "@/lib/store/auth-store"
+import { getUsers } from "@/lib/api/users"
 import { useTranslation } from "@/lib/store/language-store"
 import { fetchDashboardData, type Transaction, type Currency } from "@/lib/actions/n8n"
 import { getCurrencySymbol } from "@/lib/utils/dashboard"
@@ -89,13 +90,31 @@ export default function AccountingTransactionsPage() {
     const [filterCurrency, setFilterCurrency] = useState<"all" | Currency>("all")
     const [filterSubCategory, setFilterSubCategory] = useState<string>("all")
 
+    const [usersMap, setUsersMap] = useState<Record<string, string>>({})
+
     // Load data from webhook
     const loadData = useCallback(async (showIndicator = false) => {
         try {
             if (showIndicator) setIsRefreshing(true)
-            const data = await fetchDashboardData()
+
+            // Load transactions and users in parallel
+            const [data, usersRes] = await Promise.all([
+                fetchDashboardData(),
+                canSeeCreatedBy ? getUsers() : Promise.resolve({ success: true, data: { users: [] } })
+            ])
+
             setTransactions(data.transactions)
             setSubCategories(data.subCategories)
+
+            // Process users map
+            if (usersRes.success && usersRes.data) {
+                const map: Record<string, string> = {}
+                const usersList = (usersRes.data as { users: any[] }).users || []
+                usersList.forEach((u: any) => {
+                    map[u.id] = u.displayName || u.username
+                })
+                setUsersMap(map)
+            }
         } catch (error) {
             console.error('Data load error:', error)
             toast.error(t.toast.connectionError)
@@ -103,7 +122,7 @@ export default function AccountingTransactionsPage() {
             setIsLoading(false)
             setIsRefreshing(false)
         }
-    }, [t])
+    }, [t, canSeeCreatedBy])
 
     // Initial load
     useEffect(() => {
@@ -314,7 +333,7 @@ export default function AccountingTransactionsPage() {
                                                     <div className="flex items-center gap-1.5">
                                                         <User className="h-3.5 w-3.5" />
                                                         <span>
-                                                            {(transaction as unknown as { createdBy?: { name?: string } }).createdBy?.name || "-"}
+                                                            {transaction.createdBy?.name || usersMap[transaction.createdBy as unknown as string] || "-"}
                                                         </span>
                                                     </div>
                                                 </TableCell>

@@ -90,8 +90,28 @@ function isDemoMode(): boolean {
 }
 
 /**
+ * Convert snake_case backend entity to camelCase frontend entity
+ */
+function normalizeEntity(raw: Record<string, unknown>): Entity {
+    return {
+        id: raw.id as string,
+        type: raw.type as EntityType,
+        code: raw.code as string || `${String(raw.type).toUpperCase().slice(0, 3)}-${String(raw.id).slice(0, 4)}`,
+        name: raw.name as string,
+        contactName: (raw.contact_name || raw.contactName) as string | undefined,
+        phone: raw.phone as string | undefined,
+        email: raw.email as string | undefined,
+        tags: (raw.tags as string[] | null) || undefined,
+        notes: raw.notes as string | undefined,
+        isActive: (raw.is_active ?? raw.isActive ?? true) as boolean,
+        createdAt: (raw.created_at || raw.createdAt) as string,
+        updatedAt: (raw.updated_at || raw.updatedAt) as string,
+    }
+}
+
+/**
  * Get all entities, optionally filtered by type
- * GET /entities?type=customer
+ * GET /entities
  */
 export async function getEntities(type?: EntityType): Promise<ApiResponse<EntitiesListResponse>> {
     // Demo mode fallback
@@ -101,26 +121,93 @@ export async function getEntities(type?: EntityType): Promise<ApiResponse<Entiti
     }
 
     const queryParams = type ? `?type=${type}` : ''
-    const response = await apiFetch<EntitiesListResponse>(`/entities${queryParams}`, {
-        method: 'GET',
-    })
+    // Use direct fetch without Content-Type header (n8n may behave differently)
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.globaltripmarket.com/webhook'
+    const url = `${API_BASE_URL}/entities/${queryParams}`
 
-    // Handle various response formats
+    let response: ApiResponse<EntitiesListResponse>
+    try {
+        const fetchResponse = await fetch(url, { method: 'GET' })
+        const data = await fetchResponse.json()
+
+        // Debug: Log raw response
+        console.log('Entities direct fetch raw data:', Array.isArray(data) ? `Array[${data.length}]` : typeof data, data)
+
+        response = { success: true, data }
+    } catch (error) {
+        console.error('Entities fetch error:', error)
+        response = { success: false, error: 'Bağlantı hatası' }
+    }
+
+    // Debug: Log raw response to see what backend returns
+    console.log('Entities API raw response:', JSON.stringify(response, null, 2))
+
+    // Handle various response formats from different backends
     if (response.success && response.data) {
+        const data = response.data as unknown as Record<string, unknown>
+
+        // If data is an array directly
         if (Array.isArray(response.data)) {
-            return { success: true, data: { entities: response.data as unknown as Entity[] } }
+            console.log('Entities: data is array directly')
+            const entities = (response.data as Record<string, unknown>[]).map(normalizeEntity)
+            return { success: true, data: { entities } }
         }
-        if ((response.data as EntitiesListResponse).entities) {
-            return response
+
+        // If data has entities property (array)
+        if (Array.isArray(data.entities)) {
+            console.log('Entities: data has entities array')
+            const entities = (data.entities as Record<string, unknown>[]).map(normalizeEntity)
+            return { success: true, data: { entities } }
+        }
+
+        // If data is a SINGLE entity object (has id property)
+        if (data.id && typeof data.id === 'string') {
+            console.log('Entities: data is single entity object - wrapping in array')
+            const entity = normalizeEntity(data)
+            return { success: true, data: { entities: [entity] } }
+        }
+
+        // If data has nested data property (n8n webhook format)
+        if (data.data) {
+            if (Array.isArray(data.data)) {
+                console.log('Entities: nested data.data array found')
+                const entities = (data.data as Record<string, unknown>[]).map(normalizeEntity)
+                return { success: true, data: { entities } }
+            }
+            // Single entity in nested data
+            const nested = data.data as Record<string, unknown>
+            if (nested.id) {
+                console.log('Entities: nested data.data is single entity')
+                const entity = normalizeEntity(nested)
+                return { success: true, data: { entities: [entity] } }
+            }
+        }
+
+        // Look for any array property that might contain entities
+        if (typeof data === 'object' && data !== null) {
+            for (const key of Object.keys(data)) {
+                if (Array.isArray(data[key])) {
+                    console.log(`Entities: found array in key "${key}"`)
+                    const entities = (data[key] as Record<string, unknown>[]).map(normalizeEntity)
+                    return { success: true, data: { entities } }
+                }
+            }
         }
     }
 
-    return response
-}
+    // If response itself is an array (some backends return this)
+    if (Array.isArray(response)) {
+        console.log('Entities: response itself is array')
+        const entities = (response as unknown as Record<string, unknown>[]).map(normalizeEntity)
+        return { success: true, data: { entities } }
+    }
 
+    console.log('Entities: no matching format found, returning empty array')
+    return { success: true, data: { entities: [] } }
+}
 /**
  * Get a single entity by ID
- * GET /entities?id=xxx
+ * Fetches all entities and finds the one with matching id
  */
 export async function getEntity(id: string): Promise<ApiResponse<EntityResponse>> {
     // Demo mode fallback
@@ -146,11 +233,46 @@ export async function getEntity(id: string): Promise<ApiResponse<EntityResponse>
         return { success: false, error: 'Entity bulunamadı' }
     }
 
-    const response = await apiFetch<EntityResponse>(`/entities?id=${id}`, {
-        method: 'GET',
-    })
+    // Fetch all entities and find the one with matching id
+    // This is needed because n8n may not support query params properly
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.globaltripmarket.com/webhook'
+    const url = `${API_BASE_URL}/entities/`
 
-    return response
+    try {
+        const fetchResponse = await fetch(url, { method: 'GET' })
+        const data = await fetchResponse.json()
+
+        console.log('Entity detail - fetched all entities, looking for id:', id)
+
+        // Handle nested data.data array format (n8n returns this)
+        let entities: Record<string, unknown>[] = []
+        if (Array.isArray(data)) {
+            entities = data
+        } else if (data && data.data && Array.isArray(data.data)) {
+            entities = data.data
+        }
+
+        if (entities.length > 0) {
+            const found = entities.find((e: Record<string, unknown>) => e.id === id)
+            if (found) {
+                console.log('Entity detail - found entity:', found)
+                const entity = normalizeEntity(found as Record<string, unknown>)
+                return { success: true, data: { entity } }
+            }
+        }
+
+        // If data is a single entity matching the id
+        if (data && data.id === id) {
+            const entity = normalizeEntity(data as Record<string, unknown>)
+            return { success: true, data: { entity } }
+        }
+
+        console.log('Entity detail - entity not found in response:', data)
+        return { success: false, error: 'Entity bulunamadı' }
+    } catch (error) {
+        console.error('Get entity error:', error)
+        return { success: false, error: 'Bağlantı hatası' }
+    }
 }
 
 /**
@@ -185,6 +307,19 @@ export async function updateEntity(data: UpdateEntityRequest): Promise<ApiRespon
  */
 export async function toggleEntityStatus(id: string): Promise<ApiResponse<Entity>> {
     const response = await apiFetch<Entity>('/entities/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ id }),
+    })
+
+    return response
+}
+
+/**
+ * Delete an entity
+ * POST /entities/delete
+ */
+export async function deleteEntity(id: string): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await apiFetch<{ success: boolean }>('/entities/delete', {
         method: 'POST',
         body: JSON.stringify({ id }),
     })

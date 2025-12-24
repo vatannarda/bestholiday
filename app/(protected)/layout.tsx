@@ -220,8 +220,8 @@ export default function ProtectedLayout({
                 {/* Navigation */}
                 <ScrollArea className="flex-1 py-4">
                     <nav className="space-y-1 px-3">
-                        {/* Finance user navigation - direct to accounting module */}
-                        {!isAdmin && financeNavItems.map((item) => (
+                        {/* Finance user navigation - personal panel only for finance_user */}
+                        {user?.role === 'finance_user' && financeNavItems.map((item) => (
                             <Link
                                 key={item.href}
                                 href={item.href}
@@ -240,27 +240,29 @@ export default function ProtectedLayout({
                             </Link>
                         ))}
 
-                        {/* Admin navigation - modular */}
-                        {isAdmin && (
+                        {/* Admin and Finance Admin navigation */}
+                        {(isAdmin || user?.role === 'finance_admin') && (
                             <>
-                                {/* Master Panel Home */}
-                                <Link
-                                    href="/admin"
-                                    onClick={() => {
-                                        if (window.innerWidth < 768) setSidebarOpen(false)
-                                    }}
-                                    className={cn(
-                                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
-                                        pathname === '/admin'
-                                            ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                    )}
-                                >
-                                    <Home className="h-5 w-5 shrink-0" />
-                                    {sidebarOpen && <span>{t.masterPanel.modules}</span>}
-                                </Link>
+                                {/* Master Panel Home - Admin Only */}
+                                {isAdmin && (
+                                    <Link
+                                        href="/admin"
+                                        onClick={() => {
+                                            if (window.innerWidth < 768) setSidebarOpen(false)
+                                        }}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                                            pathname === '/admin'
+                                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                        )}
+                                    >
+                                        <Home className="h-5 w-5 shrink-0" />
+                                        {sidebarOpen && <span>{t.masterPanel.modules}</span>}
+                                    </Link>
+                                )}
 
-                                {/* Accounting Module - Collapsible */}
+                                {/* Accounting Module - For both Admin and Finance Admin */}
                                 {sidebarOpen ? (
                                     <Collapsible open={accountingOpen} onOpenChange={setAccountingOpen}>
                                         <CollapsibleTrigger className={cn(
@@ -317,30 +319,34 @@ export default function ProtectedLayout({
 
                                 <Separator className="my-3" />
 
-                                {/* Admin Management */}
-                                {sidebarOpen && (
-                                    <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider px-3 mb-2">
-                                        {t.nav.management}
-                                    </p>
-                                )}
-                                {adminItems.map((item) => (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={() => {
-                                            if (window.innerWidth < 768) setSidebarOpen(false)
-                                        }}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
-                                            isActive(item.href)
-                                                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                                                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                {/* Admin Management - Admin Only */}
+                                {isAdmin && (
+                                    <>
+                                        {sidebarOpen && (
+                                            <p className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider px-3 mb-2">
+                                                {t.nav.management}
+                                            </p>
                                         )}
-                                    >
-                                        <item.icon className="h-5 w-5 shrink-0" />
-                                        {sidebarOpen && <span>{item.title}</span>}
-                                    </Link>
-                                ))}
+                                        {adminItems.map((item) => (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                onClick={() => {
+                                                    if (window.innerWidth < 768) setSidebarOpen(false)
+                                                }}
+                                                className={cn(
+                                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]",
+                                                    isActive(item.href)
+                                                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                                )}
+                                            >
+                                                <item.icon className="h-5 w-5 shrink-0" />
+                                                {sidebarOpen && <span>{item.title}</span>}
+                                            </Link>
+                                        ))}
+                                    </>
+                                )}
                             </>
                         )}
                     </nav>
@@ -458,7 +464,9 @@ export default function ProtectedLayout({
                                 <p className="text-xs text-sidebar-foreground/60 truncate">
                                     {user?.role === 'admin'
                                         ? (language === 'tr' ? 'Yönetici' : 'Admin')
-                                        : (language === 'tr' ? 'Personel' : 'Staff')}
+                                        : user?.role === 'finance_admin'
+                                            ? (language === 'tr' ? 'Finans Yöneticisi' : 'Finance Admin')
+                                            : (language === 'tr' ? 'Personel' : 'Staff')}
                                 </p>
                             </div>
                         )}

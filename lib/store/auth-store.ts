@@ -84,9 +84,24 @@ export const useAuthStore = create<AuthState>()(
                         }
                     }
 
-                    const userData = response.data.user
+                    console.log('Login response data:', response.data)
+
+                    // Handle different response formats
+                    // 1. Standard format: { user: { ... }, token: ... }
+                    // 2. Direct format: { id: ..., username: ... }
+                    const rawData = response.data as any
+                    const userData = rawData.user || rawData
+
+                    if (!userData) {
+                        set({ isLoading: false })
+                        return {
+                            success: false,
+                            error: 'Sunucudan geçersiz yanıt alındı.'
+                        }
+                    }
 
                     // Check if user is active
+                    // Use optional chaining just in case
                     if (userData.isActive === false) {
                         set({ isLoading: false })
                         return {

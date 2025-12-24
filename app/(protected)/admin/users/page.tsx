@@ -253,7 +253,7 @@ export default function UsersPage() {
                                                     <SelectItem value="finance_user">
                                                         <div className="flex items-center gap-2">
                                                             <UserIcon className="h-4 w-4 text-blue-500" />
-                                                            {t.users.financeUser}
+                                                            {t.users.worker}
                                                         </div>
                                                     </SelectItem>
                                                 </SelectContent>
@@ -296,8 +296,11 @@ export default function UsersPage() {
                                                     <p className="text-sm text-muted-foreground">@{user.username}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                                                        {user.role === 'admin' ? t.users.admin : t.users.worker}
+                                                    <Badge variant={user.role === 'admin' ? 'default' : user.role === 'finance_admin' ? 'secondary' : 'outline'}>
+                                                        {user.role === 'admin' && t.users.admin}
+                                                        {user.role === 'finance_admin' && t.users.financeAdmin}
+                                                        {user.role === 'finance_user' && t.users.worker}
+                                                        {!['admin', 'finance_admin', 'finance_user'].includes(user.role) && t.users.worker}
                                                     </Badge>
                                                     <Badge variant={user.isActive ? 'success' : 'destructive'}>
                                                         {user.isActive ? t.users.active : t.users.inactive}
@@ -352,10 +355,17 @@ export default function UsersPage() {
                                                 <TableCell className="font-medium">@{user.username}</TableCell>
                                                 <TableCell>{user.displayName}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                                                        {user.role === 'admin' ? (
+                                                    <Badge variant={user.role === 'admin' ? 'default' : user.role === 'finance_admin' ? 'secondary' : 'outline'}>
+                                                        {user.role === 'admin' && (
                                                             <><Shield className="h-3 w-3 mr-1" />{t.users.admin}</>
-                                                        ) : (
+                                                        )}
+                                                        {user.role === 'finance_admin' && (
+                                                            <><Shield className="h-3 w-3 mr-1" />{t.users.financeAdmin}</>
+                                                        )}
+                                                        {user.role === 'finance_user' && (
+                                                            <><UserIcon className="h-3 w-3 mr-1" />{t.users.worker}</>
+                                                        )}
+                                                        {!['admin', 'finance_admin', 'finance_user'].includes(user.role) && (
                                                             <><UserIcon className="h-3 w-3 mr-1" />{t.users.worker}</>
                                                         )}
                                                     </Badge>

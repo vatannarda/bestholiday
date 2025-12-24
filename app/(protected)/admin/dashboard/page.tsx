@@ -27,6 +27,7 @@ import {
     type Currency
 } from "@/lib/actions/n8n"
 import { calculateWeeklyStats, calculateExpenseDistribution, getCurrencySymbol } from "@/lib/utils/dashboard"
+import { useAuthStore } from "@/lib/store/auth-store"
 import { useTranslation } from "@/lib/store/language-store"
 import { toast } from "sonner"
 
@@ -111,7 +112,8 @@ export default function AdminDashboard() {
         setAiLoading(true)
 
         try {
-            const response = await addTransaction(aiInput)
+            const user = useAuthStore.getState().user
+            const response = await addTransaction(aiInput, user?.id)
 
             if (response.success) {
                 toast.success(t.toast.success, {

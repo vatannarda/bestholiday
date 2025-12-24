@@ -50,8 +50,8 @@ export default function DuePage() {
             })
 
             if (response.success && response.data) {
-                setUpcoming(response.data.upcoming)
-                setOverdue(response.data.overdue)
+                setUpcoming(response.data.upcoming || [])
+                setOverdue(response.data.overdue || [])
             }
         } catch (error) {
             console.error('Load due items error:', error)

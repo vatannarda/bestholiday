@@ -16,7 +16,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function LoginPage() {
     const router = useRouter()
-    const { login, isLoading } = useAuthStore()
+    const { login, logout, isLoading } = useAuthStore()
     const { t } = useTranslation()
 
     const [adminUsername, setAdminUsername] = useState("")
@@ -26,7 +26,7 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState("")
 
-    const handleLogin = async (username: string, password: string) => {
+    const handleLogin = async (username: string, password: string, loginType: 'admin' | 'worker') => {
         setError("")
 
         if (!username.trim() || !password.trim()) {
@@ -41,8 +41,26 @@ export default function LoginPage() {
             return
         }
 
-        // Redirect based on role
         const user = useAuthStore.getState().user
+
+        // Security check: Enforce role separation
+        if (loginType === 'admin') {
+            // Admin tab: Only allow 'admin' role
+            if (user?.role !== 'admin') {
+                logout() // Logout immediately
+                setError("Bu panelden sadece Yöneticiler giriş yapabilir.")
+                return
+            }
+        } else {
+            // Worker tab: Allow everyone EXCEPT 'admin'
+            if (user?.role === 'admin') {
+                logout() // Logout immediately
+                setError("Yöneticiler 'Yönetici Girişi' sekmesinden giriş yapmalıdır.")
+                return
+            }
+        }
+
+        // Redirect based on role
         if (user?.role === 'admin') {
             router.push('/admin/dashboard')
         } else {
@@ -92,7 +110,7 @@ export default function LoginPage() {
                         <TabsContent value="admin">
                             <form onSubmit={(e) => {
                                 e.preventDefault()
-                                handleLogin(adminUsername, adminPassword)
+                                handleLogin(adminUsername, adminPassword, 'admin')
                             }} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="admin-username">{t.login.username}</Label>
@@ -147,7 +165,7 @@ export default function LoginPage() {
                         <TabsContent value="worker">
                             <form onSubmit={(e) => {
                                 e.preventDefault()
-                                handleLogin(workerUsername, workerPassword)
+                                handleLogin(workerUsername, workerPassword, 'worker')
                             }} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="worker-username">{t.login.username}</Label>
