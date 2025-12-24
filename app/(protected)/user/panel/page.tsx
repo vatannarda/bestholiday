@@ -32,8 +32,8 @@ export default function UserPanelPage() {
             if (showToast) setIsRefreshing(true)
             const data = await fetchDashboardData()
 
-            // Filter to show only user's own transactions
-            let userTransactions = data.transactions
+            // Security: Default to empty array. Only show data if user is authenticated and matches.
+            let userTransactions: Transaction[] = []
 
             if (user) {
                 userTransactions = data.transactions.filter(t => {

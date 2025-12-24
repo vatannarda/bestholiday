@@ -28,30 +28,30 @@ export function TransactionCard({
     const symbol = currencySymbols[transaction.currency] || '₺'
 
     return (
-        <Card className={`relative overflow-hidden transition-all hover:shadow-md ${isIncome ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-red-500'
+        <Card className={`relative overflow-hidden hover-card-effect border border-border/50 ${isIncome ? 'border-l-4 border-l-green-500 dark:border-l-green-600' : 'border-l-4 border-l-destructive dark:border-l-destructive'
             }`}>
             <CardContent className="p-4">
                 {/* Amount - Top Right */}
-                <div className={`absolute top-3 right-3 flex items-center gap-1 text-lg font-bold ${isIncome ? 'text-green-500' : 'text-red-500'
+                <div className={`absolute top-3 right-3 flex items-center gap-1 text-lg font-bold tabular-nums ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                     }`}>
                     {isIncome ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                    {isIncome ? '+' : '-'}{symbol}{transaction.amount.toLocaleString('tr-TR')}
+                    {isIncome ? '+' : '-'}{symbol}{transaction.amount.toLocaleString()}
                 </div>
 
                 {/* Description */}
-                <h3 className="font-medium text-base pr-24 line-clamp-2 mb-3">
+                <h3 className="font-medium text-base pr-28 line-clamp-2 mb-3 leading-snug">
                     {transaction.description}
                 </h3>
 
                 {/* Meta Info Grid */}
-                <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                <div className="flex flex-wrap gap-y-1 gap-x-4 text-sm text-muted-foreground">
                     {/* Date */}
-                    <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
+                    <div className="flex items-center gap-1.5 min-w-[120px]">
+                        <Calendar className="h-3.5 w-3.5 opacity-70" />
                         <span>{dateLabel}: </span>
-                        <span className="font-medium text-foreground">
+                        <span className="font-medium text-foreground/80">
                             {transaction.transaction_date
-                                ? new Date(transaction.transaction_date).toLocaleDateString('tr-TR')
+                                ? new Date(transaction.transaction_date).toLocaleDateString()
                                 : '-'}
                         </span>
                     </div>

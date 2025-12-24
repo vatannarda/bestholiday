@@ -580,7 +580,7 @@ export default function ProtectedLayout({
                 </header>
 
                 {/* Page Content */}
-                <div className="p-4 md:p-6">
+                <div className="p-4 md:p-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                     {children}
                 </div>
             </main>

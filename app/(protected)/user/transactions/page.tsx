@@ -89,8 +89,8 @@ export default function UserTransactionsPage() {
             if (showIndicator) setIsRefreshing(true)
             const data = await fetchDashboardData()
 
-            // User panel: Always filter to show only user's own transactions
-            let userTransactions = data.transactions
+            // User panel: Security - Default to empty array
+            let userTransactions: Transaction[] = []
 
             if (user) {
                 userTransactions = data.transactions.filter(t => {
