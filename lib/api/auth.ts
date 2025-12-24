@@ -21,13 +21,7 @@ export interface LoginResponse {
  * POST /auth/login
  */
 export async function loginUser(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    // Security Patch: Block generic "user" login
-    if (credentials.username.toLowerCase() === 'user') {
-        return {
-            success: false,
-            error: 'Geçersiz kullanıcı adı.'
-        }
-    }
+
 
     const response = await apiFetch<LoginResponse>('/auth/login', {
         method: 'POST',

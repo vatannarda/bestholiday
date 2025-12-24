@@ -34,6 +34,8 @@ export default function LoginPage() {
             return
         }
 
+
+
         const result = await login(username, password)
 
         if (!result.success) {

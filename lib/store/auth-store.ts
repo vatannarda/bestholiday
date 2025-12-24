@@ -92,11 +92,11 @@ export const useAuthStore = create<AuthState>()(
                     const rawData = response.data as any
                     const userData = rawData.user || rawData
 
-                    if (!userData) {
+                    if (!userData || !userData.role) {
                         set({ isLoading: false })
                         return {
                             success: false,
-                            error: 'Sunucudan geçersiz yanıt alındı.'
+                            error: 'Sunucudan geçersiz kullanıcı rolü alındı.'
                         }
                     }
 
@@ -114,7 +114,8 @@ export const useAuthStore = create<AuthState>()(
                         user: {
                             id: userData.id,
                             username: userData.username,
-                            role: userData.role,
+                            // Ensure role is strictly typed - NO FALLBACKS allowed to prevent unauthorized access
+                            role: userData.role?.toLowerCase() as UserRole,
                             displayName: userData.displayName,
                             isActive: userData.isActive,
                         },
